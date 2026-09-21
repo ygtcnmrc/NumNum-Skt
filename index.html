@@ -34,7 +34,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <label>Not / Raf<input id="note" placeholder="Örn. Bar depo / Raf 2"></label><div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="save">Kaydet</button><button class="secondary hidden" id="cancelEdit">Vazgeç</button></div></div></section>
 <section id="manage" class="page hidden"><div class="card"><b>Kategori & Ürün Yönetimi</b><p class="muted">Buradan kategori ve o kategoride görünecek ürünleri oluşturabilir, düzenleyebilir veya silebilirsin.</p><button class="primary" id="addCat">➕ Yeni kategori</button><div id="manageCats" style="margin-top:12px"></div></div><div class="card"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
-<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+
 <script>
 const KEY='barskt_v4';
 const seed={
@@ -70,6 +70,8 @@ function level(p){let d=days(p);if(d<0)return ['danger','GEÇMİŞ'];if(d===0)re
 function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
+function show(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));if(page==='products')renderProducts();if(page==='manage')renderManage();if(page==='add')renderProductTemplate();window.scrollTo({top:0,behavior:'smooth'})}
+document.querySelectorAll('nav button[data-page]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.page)));
 function fillCats(){let o=db.categories.map(c=>`<option>${esc(c)}</option>`).join('');$('category').innerHTML=o;$('filter').innerHTML='<option value="">Tüm kategoriler</option>'+o}
 function renderStats(){let ps=db.products;$('total').textContent=ps.length;$('d30').textContent=ps.filter(p=>days(p)>=0&&days(p)<=30).length;$('d15').textContent=ps.filter(p=>days(p)>=0&&days(p)<=15).length;$('d5').textContent=ps.filter(p=>days(p)>=0&&days(p)<=5).length}
 function renderAlerts(){let groups=[['30 gün uyarısı',30,16,'blue'],['15 gün uyarısı',15,6,'warn'],['5 gün uyarısı',5,0,'danger']];let out='';for(const [title,max,min,cl] of groups){let ps=db.products.filter(p=>{let d=days(p);return d>=min&&d<=max}).sort((a,b)=>days(a)-days(b));if(ps.length)out+=`<div class="sectionTitle">${title}</div>`+ps.slice(0,15).map(alertCard).join('')}let ex=db.products.filter(p=>days(p)<0).sort((a,b)=>days(a)-days(b));if(ex.length)out+=`<div class="sectionTitle">⛔ Süresi geçen</div>`+ex.slice(0,10).map(alertCard).join('');$('alerts').innerHTML=out||'<div class="empty">🎉 Yaklaşan SKT yok.</div>'}
@@ -94,10 +96,40 @@ function renameProduct(c,p){let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())|
 function deleteCatalogProduct(c,p){let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);save()}
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
 let reader=null,controls=null;
+let zxingPromise=null;
+function loadZXing(){
+  if(window.ZXingBrowser) return Promise.resolve();
+  if(zxingPromise) return zxingPromise;
+  zxingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement("script"); s.src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"; s.async=true;
+    s.onload=()=>resolve(); s.onerror=()=>reject(new Error("ZXing yüklenemedi")); document.head.appendChild(s);
+  });
+  return zxingPromise;
+}
+
 async function stopScanner(){try{controls?.stop()}catch(e){}controls=null;try{reader?.reset()}catch(e){}reader=null;let v=$('barcodeVideo');try{v.srcObject?.getTracks().forEach(t=>t.stop());v.srcObject=null}catch(e){}$('scannerBox').classList.add('hidden')}
-async function startScanner(){if(!window.ZXingBrowser)return toast('Barkod modülü yüklenemedi');$('scannerBox').classList.remove('hidden');try{reader=new ZXingBrowser.BrowserMultiFormatReader();let devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();let back=devices.find(d=>/back|rear|environment|ark/i.test(d.label))||devices[devices.length-1];controls=await reader.decodeFromVideoDevice(back?.deviceId,$('barcodeVideo'),async r=>{if(r){let code=r.getText();$('barcode').value=code;await stopScanner();await lookup(code)}})}catch(e){await stopScanner();toast('Kamera açılamadı. Safari kamera iznini kontrol et.')}}
+async function startScanner(){
+  $('scannerBox').classList.remove('hidden');
+  try{
+    if('BarcodeDetector' in window){
+      const supported=await BarcodeDetector.getSupportedFormats().catch(()=>[]);
+      const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','code_39'].filter(x=>!supported.length||supported.includes(x));
+      const detector=new BarcodeDetector({formats:wanted.length?wanted:undefined});
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
+      const v=$('barcodeVideo'); v.srcObject=stream; await v.play();
+      let stopped=false; const scan=async()=>{if(stopped)return; try{const codes=await detector.detect(v); if(codes.length){const code=codes[0].rawValue; $('barcode').value=code; stopped=true; await stopScanner(); await lookup(code); return;}}catch(e){} requestAnimationFrame(scan)}; scan();
+      return;
+    }
+    await loadZXing();
+    if(!window.ZXingBrowser) throw new Error('Barkod modülü yüklenemedi');
+    reader=new ZXingBrowser.BrowserMultiFormatReader();
+    let devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    let back=devices.find(d=>/back|rear|environment|ark/i.test(d.label))||devices[devices.length-1];
+    controls=await reader.decodeFromVideoDevice(back?.deviceId,$('barcodeVideo'),async r=>{if(r){let code=r.getText();$('barcode').value=code;await stopScanner();await lookup(code)}});
+  }catch(e){await stopScanner();toast('Kamera açılamadı. Safari Ayarlar > Kamera iznini kontrol et veya barkodu elle gir.')}}
 async function lookup(code){toast('Barkod okunuyor...');try{let r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');let j=await r.json();if(j.status===1&&j.product){let p=j.product;let name=p.product_name_tr||p.product_name||p.generic_name_tr||p.generic_name;if(name){let cat=findCat(p);if(cat&&db.catalog[cat]?.includes(name)){$('category').value=cat;renderProductTemplate();$('productTemplate').value=name}else{$('category').value=cat||$('category').value;renderProductTemplate();let arr=db.catalog[$('category').value]||[];let existing=arr.find(x=>x.toLowerCase()===name.toLowerCase());$('productTemplate').value=existing||'';if(!existing)toast('Barkod okundu. Ürün listede yok; Yönetimden bu kategoriye ekleyebilirsin.')}}toast('Barkod okundu.')}else toast('Barkod okundu; ürün veri tabanında bulunamadı.')}catch(e){toast('Barkod okundu; internetten ürün bilgisi alınamadı.')}}
 function findCat(p){let c=((p.categories_tags||[]).join(' ')+' '+(p.categories||'')).toLowerCase();if(/beer|bira/.test(c))return'Bira';if(/wine|şarap/.test(c))return'Şarap';if(/vodka/.test(c))return'Vodka';if(/gin/.test(c))return'Gin';if(/whisky|whiskey/.test(c))return'Whisky';if(/rum/.test(c))return'Rum';if(/tequila/.test(c))return'Tequila';if(/liqueur|likör/.test(c))return'Likör';if(/soft-drink|soda|cola|lemonade|meşrubat/.test(c))return'Soft İçecekler';return null}
 $('scanBarcode').onclick=startScanner;$('closeScanner').onclick=stopScanner;$('manualBtn').onclick=()=>{stopScanner();$('barcode').focus()};$('torchBtn').onclick=async()=>{let t=$('barcodeVideo').srcObject?.getVideoTracks?.()[0];try{let c=t?.getCapabilities?.();if(c?.torch)await t.applyConstraints({advanced:[{torch:!(t.getSettings().torch===true)}]});else toast('Bu kamerada ışık kontrolü yok')}catch(e){toast('Işık açılamadı')}};
 render();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script></body></html>
