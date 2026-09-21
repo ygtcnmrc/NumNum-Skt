@@ -18,7 +18,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 </style></head>
 <body>
 <header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div class="stats">
-<div class="stat"><b id="total">0</b><span>Toplam stok</span></div><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
+<button class="stat statBtn" id="statAll"><b id="total">0</b><span>Toplam stok · tümü</span></button><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
 <div class="container"><nav>
 <button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="manage">⚙️<br>Yönetim</button></nav>
 <section id="home" class="page"><div class="card"><div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div><div id="alerts"></div></div><div class="card"><b>Kategoriler</b><div id="categories" style="margin-top:8px"></div></div></section>
@@ -85,6 +85,7 @@ function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]
 function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
 function renderManage(){$('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${icons[c]||'📦'} ${esc(c)}</b><div class="actions"><button class="icon" onclick="renameCat(${JSON.stringify(c)})">✏️</button><button class="icon dangerBtn" onclick="deleteCat(${JSON.stringify(c)})">🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick="renameProduct(${JSON.stringify(c)},${JSON.stringify(p)})">✏️</button><button class="icon dangerBtn" onclick="deleteCatalogProduct(${JSON.stringify(c)},${JSON.stringify(p)})">🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick="addCatalogProduct(${JSON.stringify(c)})">➕ Bu kategoriye ürün ekle</button></div>`}).join('')}
 function openExpiryRange(min,max,title){expiryRange={min,max,title};show('products');renderProducts()}
+$('statAll').onclick=()=>{expiryRange=null;show('products');renderProducts()};
 $('stat30').onclick=()=>openExpiryRange(16,30,'SKT 30-16 gün kalan ürünler');
 $('stat15').onclick=()=>openExpiryRange(6,15,'SKT 15-6 gün kalan ürünler');
 $('stat5').onclick=()=>openExpiryRange(0,5,'SKT 5 gün ve daha az kalan ürünler');
