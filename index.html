@@ -64,7 +64,10 @@ if(!db){
   if(old?.products?.length) db.products=old.products.map(p=>({...p,id:p.id||crypto.randomUUID()}));
 }
 // Eski sürüm verisini mümkün olduğunca koru
-if(!db.categories) db.categories=Object.keys(seed); if(!db.catalog) db.catalog={}; if(!db.products) db.products=[]; if(!db.barcodeMap) db.barcodeMap={};
+if(!db.categories) db.categories=Object.keys(seed); if(!db.catalog) db.catalog={}; if(!db.products) db.products=[]; if(!db.barcodeMap) db.barcodeMap={}; if(!db.categoryIcons) db.categoryIcons={};
+// Kategori ikonlarını geriye dönük uyumlu şekilde hazırla.
+db.categories.forEach(c=>{if(!db.categoryIcons[c]) db.categoryIcons[c]=defaultIcons[c]||'📦'});
+function catIcon(c){return db.categoryIcons[c]||defaultIcons[c]||'📦'}
 // Mevcut stoklardaki barkodları kalıcı ürün-barkod eşleştirmesine dönüştür.
 db.products.forEach(p=>{if(p.barcode&&p.name&&p.category){db.barcodeMap[p.barcode.trim()]={category:p.category,name:p.name}}});
 Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categories.push(c);if(!db.catalog[c])db.catalog[c]=[];ps.forEach(p=>{if(!db.catalog[c].includes(p))db.catalog[c].push(p)})});
