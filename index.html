@@ -35,6 +35,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <section id="manage" class="page hidden"><div class="card"><b>Kategori & Ürün Yönetimi</b><p class="muted">Buradan kategori ve o kategoride görünecek ürünleri oluşturabilir, düzenleyebilir veya silebilirsin.</p><button class="primary" id="addCat">➕ Yeni kategori</button><div id="manageCats" style="margin-top:12px"></div></div><div class="card"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
 <div id="iconModal" class="modalBack hidden"><div class="modal"><h3 id="iconModalTitle">Kategori simgesi seç</h3><div class="muted">Restoran/bar için bir simge seçebilirsin.</div><div id="iconGrid" class="iconGrid"></div><div class="modalActions"><button class="secondary" id="closeIconModal" style="flex:1">Vazgeç</button></div></div></div>
+<div id="productModal" class="modalBack hidden"><div class="modal"><h3>Ürün ekle</h3><div class="muted" id="productModalCat"></div><label>Ürün adı<input id="manageProductName" type="text" placeholder="Örn. Damla Soda" autocomplete="off"></label><div class="modalActions"><button class="secondary" id="cancelProductModal" style="flex:1">Vazgeç</button><button class="primary" id="saveProductModal" style="flex:1">Ürünü ekle</button></div></div></div>
 
 <script>
 const KEY='barskt_v5';
@@ -87,7 +88,6 @@ function renderSummary(){$('categories').innerHTML=db.categories.map(c=>`<div cl
 function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
 function renderManage(){
   $('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card manageCat" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b style="font-size:17px">${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon manage-icon" data-cat="${esc(c)}">🎨</button><button class="icon manage-rename" data-cat="${esc(c)}">✏️</button><button class="icon dangerBtn manage-delete" data-cat="${esc(c)}">🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon manage-product-rename" data-cat="${esc(c)}" data-product="${esc(p)}">✏️</button><button class="icon dangerBtn manage-product-delete" data-cat="${esc(c)}" data-product="${esc(p)}">🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary manage-add-product manageAdd" data-cat="${esc(c)}">➕ Bu kategoriye ürün ekle</button></div>`}).join('')}
-}
 function openExpiryRange(min,max,title){expiryRange={min,max,title};show('products');renderProducts()}
 $('statAll').onclick=()=>{expiryRange=null;show('products');renderProducts()};
 $('stat30').onclick=()=>openExpiryRange(16,30,'SKT 30-16 gün kalan ürünler');
@@ -109,10 +109,32 @@ function addCat(){let n=prompt('Yeni kategori adı:');if(!n)return;n=n.trim();if
 function createCategoryWithIcon(){let n=window.pendingNewCategoryName;if(!n)return;db.categories.push(n);db.catalog[n]=[];db.categoryIcons[n]=window.pendingNewCategoryIcon||'📦';window.pendingNewCategoryName=null;window.pendingNewCategoryIcon=null;save();$('category').value=n;renderProductTemplate();toast('Kategori oluşturuldu')}
 function renameCat(c){let n=prompt('Kategori adı:',c);if(!n||!(n=n.trim())||n===c)return;if(db.categories.includes(n))return toast('Bu kategori zaten var');let i=db.categories.indexOf(c);db.categories[i]=n;db.catalog[n]=db.catalog[c]||[];db.categoryIcons[n]=db.categoryIcons[c]||icons[c]||'📦';delete db.catalog[c];delete db.categoryIcons[c];db.products.forEach(p=>{if(p.category===c)p.category=n});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c)v.category=n});save();toast('Kategori adı değiştirildi')}
 function deleteCat(c){if(db.categories.length<=1)return toast('En az bir kategori kalmalı');let count=db.products.filter(p=>p.category===c).length;if(count&&!confirm(`Bu kategoride ${count} stok kaydı var. Kategoriyi silersen stok kayıtları başka kategoriye taşınacak. Devam?`))return;let target=db.categories.find(x=>x!==c);db.products.forEach(p=>{if(p.category===c)p.category=target});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c)v.category=target});delete db.catalog[c];delete db.categoryIcons[c];db.categories=db.categories.filter(x=>x!==c);save();toast('Kategori silindi')}
-function addCatalogProduct(c){if(!db.categories.includes(c))return toast('Kategori bulunamadı');let n=prompt(`${c} kategorisine eklenecek ürün adı:`);if(n===null)return;n=n.trim();if(!n)return toast('Ürün adı gerekli');if(!db.catalog[c])db.catalog[c]=[];if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');db.catalog[c].push(n);save();$('category').value=c;renderProductTemplate();$('productTemplate').value=n;toast(`${n} ürünü ${c} kategorisine eklendi`)}
+function addCatalogProduct(c){
+  if(!db.categories.includes(c))return toast('Kategori bulunamadı');
+  window.pendingProductCategory=c;
+  $('productModalCat').textContent='Kategori: '+c;
+  $('manageProductName').value='';
+  $('productModal').classList.remove('hidden');
+  setTimeout(()=>$('manageProductName').focus(),100);
+}
+function closeProductModal(){$('productModal').classList.add('hidden');window.pendingProductCategory=null;$('manageProductName').value=''}
+function saveCatalogProductFromModal(){
+  const c=window.pendingProductCategory;
+  if(!c||!db.categories.includes(c))return closeProductModal();
+  const n=$('manageProductName').value.trim();
+  if(!n)return toast('Ürün adı gerekli');
+  if(!db.catalog[c])db.catalog[c]=[];
+  if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');
+  db.catalog[c].push(n);save();
+  $('category').value=c;renderProductTemplate();$('productTemplate').value=n;
+  closeProductModal();renderManage();toast(`${n} ürünü ${c} kategorisine eklendi`);
+}
+$('cancelProductModal').onclick=closeProductModal;
+$('saveProductModal').onclick=saveCatalogProductFromModal;
+$('manageProductName').addEventListener('keydown',e=>{if(e.key==='Enter')saveCatalogProductFromModal();if(e.key==='Escape')closeProductModal()});
 function renameProduct(c,p){let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;let arr=db.catalog[c]||[];if(arr.includes(n))return toast('Bu ürün zaten var');arr[arr.indexOf(p)]=n;db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});save();toast('Ürün adı değiştirildi')}
 function deleteCatalogProduct(c,p){let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});save();toast('Ürün tanımından silindi')}
-$('manageCats').addEventListener('click',e=>{let b=e.target.closest('button');if(!b)return;let c=b.dataset.cat,p=b.dataset.product;if(b.classList.contains('manage-add-product'))addCatalogProduct(c);else if(b.classList.contains('manage-rename'))renameCat(c);else if(b.classList.contains('manage-delete'))deleteCat(c);else if(b.classList.contains('manage-product-rename'))renameProduct(c,p);else if(b.classList.contains('manage-product-delete'))deleteCatalogProduct(c,p);else if(b.classList.contains('manage-icon'))openIconPicker(c,'existing')});
+$('manageCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!$('manageCats').contains(b))return;e.preventDefault();e.stopPropagation();const c=b.dataset.cat,p=b.dataset.product;if(b.classList.contains('manage-add-product'))return addCatalogProduct(c);if(b.classList.contains('manage-rename'))return renameCat(c);if(b.classList.contains('manage-delete'))return deleteCat(c);if(b.classList.contains('manage-product-rename'))return renameProduct(c,p);if(b.classList.contains('manage-product-delete'))return deleteCatalogProduct(c,p);if(b.classList.contains('manage-icon'))return openIconPicker(c,'existing')});
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
 let reader=null,controls=null;
 let zxingPromise=null;
