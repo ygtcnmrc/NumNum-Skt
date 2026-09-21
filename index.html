@@ -100,7 +100,34 @@ $('newCategoryInline').onclick=()=>{addCat()};$('newProductInline').onclick=()=>
 function addCat(){let n=prompt('Yeni kategori adı:');if(!n)return;n=n.trim();if(!n)return;if(db.categories.includes(n))return toast('Bu kategori zaten var');db.categories.push(n);db.catalog[n]=[];save();$('category').value=n;renderProductTemplate();toast('Kategori oluşturuldu')}
 function renameCat(c){let n=prompt('Kategori adı:',c);if(!n||!(n=n.trim())||n===c)return;if(db.categories.includes(n))return toast('Bu kategori zaten var');let i=db.categories.indexOf(c);db.categories[i]=n;db.catalog[n]=db.catalog[c]||[];delete db.catalog[c];db.products.forEach(p=>{if(p.category===c)p.category=n});save();toast('Kategori adı değiştirildi')}
 function deleteCat(c){if(db.categories.length<=1)return toast('En az bir kategori kalmalı');let count=db.products.filter(p=>p.category===c).length;if(count&&!confirm(`Bu kategoride ${count} stok kaydı var. Kategoriyi silersen stok kayıtları "Diğer" kategorisine taşınacak. Devam?`))return;let target=db.categories.find(x=>x!==c);db.products.forEach(p=>{if(p.category===c)p.category=target});delete db.catalog[c];db.categories=db.categories.filter(x=>x!==c);save();toast('Kategori silindi')}
-function addCatalogProduct(c){if(!db.categories.includes(c))return toast('Kategori bulunamadı');let n=prompt(`${c} kategorisine eklenecek ürün adı:`);if(n===null)return;n=n.trim();if(!n)return toast('Ürün adı gerekli');if(!db.catalog[c])db.catalog[c]=[];if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');db.catalog[c].push(n);save();$('category').value=c;renderProductTemplate();$('productTemplate').value=n;toast(`${n} ürünü ${c} kategorisine eklendi`)}
+function addCatalogProduct(c){
+  if(!db.categories.includes(c))return toast('Kategori bulunamadı');
+  let old=document.getElementById('catalogProductModal'); if(old)old.remove();
+  const modal=document.createElement('div'); modal.id='catalogProductModal';
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="width:100%;max-width:430px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 15px 40px #0005">
+    <div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(c)} kategorisine ürün ekle</div>
+    <div style="font-size:13px;color:#68756e;margin-bottom:12px">Bu ürün daha sonra Ürün Ekle ekranındaki ürün listesinde görünecek.</div>
+    <input id="catalogProductName" type="text" placeholder="Ürün adı" autocomplete="off" style="width:100%;padding:13px;border:1px solid #d9e0dc;border-radius:11px;font-size:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button type="button" class="secondary" id="catalogProductCancel">Vazgeç</button>
+      <button type="button" class="primary" id="catalogProductSave">Ürünü ekle</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  const input=document.getElementById('catalogProductName');
+  const close=()=>{modal.remove()};
+  document.getElementById('catalogProductCancel').onclick=close;
+  document.getElementById('catalogProductSave').onclick=()=>{
+    let n=(input.value||'').trim();
+    if(!n)return toast('Ürün adı gerekli');
+    if(!db.catalog[c])db.catalog[c]=[];
+    if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');
+    db.catalog[c].push(n); save(); $('category').value=c; renderProductTemplate(); $('productTemplate').value=n; close(); toast(`${n} ürünü ${c} kategorisine eklendi`);
+  };
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  setTimeout(()=>input.focus(),50);
+}
 function renameProduct(c,p){let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;let arr=db.catalog[c]||[];if(arr.includes(n))return toast('Bu ürün zaten var');arr[arr.indexOf(p)]=n;db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});save();toast('Ürün adı değiştirildi')}
 function deleteCatalogProduct(c,p){let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});save();toast('Ürün tanımından silindi')}
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
