@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b7a53">
+<link rel="manifest" href="manifest.json">
+<title>BarSKT</title>
+<style>
+:root{--g:#0b7a53;--g2:#075b3d;--bg:#f5f7f6;--card:#fff;--text:#18221e;--muted:#6b7771;--danger:#c62828;--warn:#d97706;--ok:#15803d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--text)}
+header{background:linear-gradient(135deg,var(--g),var(--g2));color:white;padding:22px 18px 18px;border-radius:0 0 22px 22px;position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:25px}.sub{opacity:.82;font-size:13px;margin-top:3px}
+.container{max-width:760px;margin:auto;padding:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px}.stat{background:rgba(255,255,255,.13);padding:11px;border-radius:13px}.stat b{display:block;font-size:21px}.stat span{font-size:11px;opacity:.85}
+nav{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;background:#fff;padding:8px;border-radius:15px;margin:12px 0;box-shadow:0 2px 10px #0000000b}nav button{border:0;background:transparent;padding:9px 3px;border-radius:10px;color:var(--muted);font-weight:600;font-size:11px}nav button.active{background:#e5f4ee;color:var(--g)}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 2px 12px #0000000b}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.muted{color:var(--muted);font-size:12px}.pill{padding:5px 8px;border-radius:20px;font-size:11px;font-weight:700}.danger{background:#fee2e2;color:var(--danger)}.warn{background:#ffedd5;color:var(--warn)}.ok{background:#dcfce7;color:var(--ok)}
+button.primary{background:var(--g);color:white;border:0;border-radius:12px;padding:12px 15px;font-weight:700}button.secondary{background:#eef2ef;border:0;border-radius:12px;padding:11px 13px;color:#23332b;font-weight:600}button.icon{border:0;background:#eef2ef;border-radius:10px;padding:8px}
+input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px}label{font-size:12px;color:var(--muted);display:block;margin:10px 0 0}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.search{position:relative}.search input{padding-left:38px}.search span{position:absolute;left:13px;top:15px}
+.item h3{margin:0;font-size:16px}.item p{margin:5px 0}.empty{text-align:center;color:var(--muted);padding:35px 10px}.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:9px}.toolbar>*{flex:1}
+.hidden{display:none!important}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#17221d;color:white;padding:12px 16px;border-radius:12px;z-index:20;font-size:13px;max-width:90%}
+footer{height:30px}
+</style>
+</head>
+<body>
+<header>
+  <div class="container" style="padding:0">
+    <h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div>
+    <div class="stats">
+      <div class="stat"><b id="total">0</b><span>Toplam ürün</span></div>
+      <div class="stat"><b id="soon">0</b><span>30 gün içinde</span></div>
+      <div class="stat"><b id="expired">0</b><span>Süresi geçmiş</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+<nav>
+ <button class="active" data-page="home">🏠<br>Ana Sayfa</button>
+ <button data-page="products">📦<br>Ürünler</button>
+ <button data-page="add">➕<br>Ürün Ekle</button>
+ <button data-page="settings">⚙️<br>Ayarlar</button>
+</nav>
+
+<section id="home" class="page">
+ <div class="card">
+  <div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div>
+  <div id="alerts"></div>
+ </div>
+ <div class="card">
+  <b>Kategoriler</b><div id="categories" style="margin-top:10px"></div>
+ </div>
+</section>
+
+<section id="products" class="page hidden">
+ <div class="toolbar">
+  <div class="search"><span>🔎</span><input id="search" placeholder="Ürün ara..."></div>
+  <select id="filter"><option value="">Tüm kategoriler</option></select>
+ </div>
+ <div id="productList"></div>
+</section>
+
+<section id="add" class="page hidden">
+ <div class="card">
+  <b>Yeni ürün</b>
+  <label>Ürün adı<input id="name" placeholder="Örn. Corona Extra"></label>
+  <label>Kategori<select id="category"></select></label>
+  <label>SKT<input id="expiry" type="date"></label>
+  <div class="grid2">
+   <label>Miktar<input id="qty" type="number" min="0" value="1"></label>
+   <label>Birim<select id="unit"><option>Adet</option><option>Kutu</option><option>Şişe</option><option>Kg</option><option>Litre</option><option>Paket</option></select></label>
+  </div>
+  <label>Barkod / ürün kodu<input id="barcode" inputmode="numeric" placeholder="İsteğe bağlı"></label>
+  <label>Not<input id="note" placeholder="Örn. Bar depo"></label>
+  <div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="save">Kaydet</button><button class="secondary" id="demo">Örnek ürün</button></div>
+  <p class="muted">Not: Bu ilk sürüm verileri telefonunuzda saklar. Barkod alanı hazır; kamera barkod tarama ve otomatik SKT okuma sonraki native sürümde eklenebilir.</p>
+ </div>
+</section>
+
+<section id="settings" class="page hidden">
+ <div class="card">
+  <b>Ayarlar</b>
+  <label>SKT uyarı eşiği (gün)<input id="threshold" type="number" min="1" value="30"></label>
+  <button class="primary" style="margin-top:12px" id="notify">Bildirim izni iste</button>
+  <p class="muted">Tarayıcı bildirimleri cihaz ve tarayıcı desteğine bağlıdır. Uygulama açıldığında SKT kontrolü yapılır.</p>
+ </div>
+ <div class="card">
+  <b>Veri</b><div style="display:flex;gap:8px;margin-top:10px"><button class="secondary" id="export">JSON yedekle</button><button class="secondary" id="clear">Tüm veriyi sil</button></div>
+ </div>
+</section>
+<footer></footer>
+</div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const KEY='barskt_v1';
+const defaultCats=[['🍺','Bira'],['🍷','Şarap'],['☕','Kahve'],['🥃','Spirit / Alkol'],['🥤','Meşrubat'],['🍋','Gıda / Garnitür'],['🧴','Diğer']];
+let db=JSON.parse(localStorage.getItem(KEY)||'null')||{products:[],threshold:30,categories:defaultCats.map(x=>x[1])};
+function saveDB(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+const $=id=>document.getElementById(id);
+const daysLeft=p=>Math.ceil((new Date(p.expiry+'T23:59:59')-new Date())/86400000);
+function status(p){let d=daysLeft(p);return d<0?'danger':d<=Number(db.threshold||30)?'warn':'ok'}
+function fmtDate(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
+function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2500)}
+function render(){
+ $('threshold').value=db.threshold||30;
+ $('total').textContent=db.products.length;
+ $('soon').textContent=db.products.filter(p=>daysLeft(p)>=0&&daysLeft(p)<=Number(db.threshold||30)).length;
+ $('expired').textContent=db.products.filter(p=>daysLeft(p)<0).length;
+ $('today').textContent=new Date().toLocaleDateString('tr-TR');
+ fillCategories(); renderAlerts(); renderProducts(); renderCategorySummary();
+}
+function fillCategories(){
+ const opts=db.categories.map(c=>`<option>${c}</option>`).join('');
+ $('category').innerHTML=opts; $('filter').innerHTML='<option value="">Tüm kategoriler</option>'+opts;
+}
+function renderAlerts(){
+ const ps=[...db.products].sort((a,b)=>daysLeft(a)-daysLeft(b)).filter(p=>daysLeft(p)<=Number(db.threshold||30));
+ $('alerts').innerHTML=ps.length?ps.slice(0,12).map(p=>`<div class="card item" style="box-shadow:none;border:1px solid #edf0ee">
+ <div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${status(p)}">${daysLeft(p)<0?'GEÇMİŞ':daysLeft(p)===0?'BUGÜN':daysLeft(p)+' gün'}</span></div>
+ <div class="muted">SKT: ${fmtDate(p.expiry)}</div></div>`).join(''):'<div class="empty">🎉 Yaklaşan SKT yok.</div>';
+}
+function renderProducts(){
+ let q=($('search').value||'').toLowerCase(), f=$('filter').value;
+ let ps=db.products.filter(p=>(!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))).sort((a,b)=>daysLeft(a)-daysLeft(b));
+ $('productList').innerHTML=ps.length?ps.map(p=>`<div class="card item">
+ <div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${status(p)}">${daysLeft(p)<0?'GEÇMİŞ':daysLeft(p)===0?'BUGÜN':daysLeft(p)+' gün'}</span></div>
+ <p>SKT: <b>${fmtDate(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div>
+ <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="icon" onclick="del('${p.id}')">🗑️</button></div>
+ </div>`).join(''):'<div class="empty">Henüz ürün yok.<br>➕ Ürün Ekle ile başlayabilirsin.</div>';
+}
+function renderCategorySummary(){
+ $('categories').innerHTML=db.categories.map(c=>{let n=db.products.filter(p=>p.category===c).length;return `<div class="row" style="padding:9px 0;border-bottom:1px solid #eef1ef"><span>${esc(c)}</span><b>${n}</b></div>`}).join('');
+}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function addProduct(p){db.products.push({...p,id:crypto.randomUUID()});saveDB();toast('Ürün kaydedildi');show('products')}
+function adjust(id,n){let p=db.products.find(x=>x.id===id);if(p){p.qty=Math.max(0,Number(p.qty)+n);saveDB()}}
+function del(id){if(confirm('Bu ürünü silmek istiyor musun?')){db.products=db.products.filter(p=>p.id!==id);saveDB()}}
+function show(page){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$(page).classList.remove('hidden');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page))}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.page));
+$('search').oninput=renderProducts;$('filter').onchange=renderProducts;
+$('threshold').onchange=()=>{db.threshold=Math.max(1,Number($('threshold').value));saveDB()};
+$('save').onclick=()=>{let name=$('name').value.trim(),cat=$('category').value,exp=$('expiry').value;if(!name||!exp)return toast('Ürün adı ve SKT gerekli');addProduct({name,category:cat,expiry:exp,qty:Number($('qty').value)||0,unit:$('unit').value,barcode:$('barcode').value.trim(),note:$('note').value.trim()});['name','expiry','barcode','note'].forEach(id=>$(id).value='');$('qty').value=1};
+$('demo').onclick=()=>{let d=new Date();d.setDate(d.getDate()+7);$('name').value='Corona Extra';$('category').value='Bira';$('expiry').value=d.toISOString().slice(0,10);$('qty').value=24;$('unit').value='Şişe';$('note').value='Bar depo'};
+$('notify').onclick=async()=>{if(!('Notification'in window))return toast('Bu tarayıcı bildirim desteklemiyor');let p=await Notification.requestPermission();toast(p==='granted'?'Bildirim izni verildi':'Bildirim izni verilmedi')};
+$('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};
+$('clear').onclick=()=>{if(confirm('TÜM ürün verileri silinecek. Emin misin?')){db.products=[];saveDB();toast('Veriler silindi')}};
+function checkNotifications(){let due=db.products.filter(p=>daysLeft(p)>=0&&daysLeft(p)<=Number(db.threshold||30));if(Notification.permission==='granted'&&due.length) new Notification('BarSKT', {body:`${due.length} ürünün SKT kontrolü gerekiyor.`})}
+if('serviceWorker'in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();checkNotifications();
+</script>
+</body></html>
