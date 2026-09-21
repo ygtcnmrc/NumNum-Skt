@@ -57,15 +57,29 @@ const seed={
 };
 const icons={'Bira':'🍺','Şarap':'🍷','Vodka':'🥃','Gin':'🍸','Whisky':'🥃','Rum':'🥃','Tequila':'🌵','Likör':'🍹','Cognac & Grappa':'🥃','Aperitif & Vermouth':'🍸','Rakı':'🥃','Soft İçecekler':'🥤','Ice Tea':'🧊','Limonatalar':'🍋'};
 const iconChoices=['🍺','🍻','🍷','🥂','🍾','🥃','🍸','🍹','🧉','🍺','☕','🍵','🥤','🧃','🧋','💧','🧊','🍋','🍊','🍓','🍎','🍒','🥭','🍉','🍏','🍇','🥝','🍍','🥥','🍸','🍽️','🍴','🥨','🍟','🍔','🌶️','🫒','🧀','🥩','🍗','🧁','🍰','🍪','🧊','📦'];
-let db=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('barskt_v4')||'null');
+let db=null;
+for(const k of [KEY,'barskt_v10','barskt_v9','barskt_v8','barskt_v7','barskt_v6','barskt_v5','barskt_v4','barskt_v3','barskt_v2','barskt_v1']){
+  try{const raw=localStorage.getItem(k); if(raw){const parsed=JSON.parse(raw); if(parsed&&typeof parsed==='object'){db=parsed;break}}}catch(e){}
+}
 let expiryRange=null;
 if(!db){
-  const old=JSON.parse(localStorage.getItem('barskt_v1')||'null');
-  db={categories:Object.keys(seed),catalog:{...seed},products:[],editId:null};
-  if(old?.products?.length) db.products=old.products.map(p=>({...p,id:p.id||crypto.randomUUID()}));
+  db={categories:Object.keys(seed),catalog:{},products:[],editId:null,barcodeMap:{},categoryIcons:{}};
 }
-// Eski sürüm verisini mümkün olduğunca koru
-if(!db.categories) db.categories=Object.keys(seed); if(!db.catalog) db.catalog={}; if(!db.products) db.products=[]; if(!db.barcodeMap) db.barcodeMap={}; if(!db.categoryIcons) db.categoryIcons={}; Object.entries(icons).forEach(([c,i])=>{if(!db.categoryIcons[c])db.categoryIcons[c]=i});
+// Eski sürümlerden gelen veriyi korurken bozuk/eksik katalog durumunu onar.
+if(!Array.isArray(db.categories)) db.categories=[];
+if(!db.catalog || typeof db.catalog!=='object') db.catalog={};
+if(!Array.isArray(db.products)) db.products=[];
+if(!db.barcodeMap || typeof db.barcodeMap!=='object') db.barcodeMap={};
+if(!db.categoryIcons || typeof db.categoryIcons!=='object') db.categoryIcons={};
+// Kategoriler boş kalmışsa veya eksikse menüden gelen temel kategorileri geri yükle.
+Object.entries(seed).forEach(([c,ps])=>{
+  if(!db.categories.includes(c)) db.categories.push(c);
+  if(!Array.isArray(db.catalog[c])) db.catalog[c]=[];
+  ps.forEach(p=>{if(!db.catalog[c].includes(p)) db.catalog[c].push(p)});
+});
+Object.entries(icons).forEach(([c,i])=>{if(!db.categoryIcons[c])db.categoryIcons[c]=i});
+// Özel kategoriler için varsayılan simge.
+db.categories.forEach(c=>{if(!db.categoryIcons[c])db.categoryIcons[c]='📦';if(!Array.isArray(db.catalog[c]))db.catalog[c]=[]});
 // Mevcut stoklardaki barkodları kalıcı ürün-barkod eşleştirmesine dönüştür.
 db.products.forEach(p=>{if(p.barcode&&p.name&&p.category){db.barcodeMap[p.barcode.trim()]={category:p.category,name:p.name}}});
 Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categories.push(c);if(!db.catalog[c])db.catalog[c]=[];ps.forEach(p=>{if(!db.catalog[c].includes(p))db.catalog[c].push(p)})});
@@ -87,7 +101,14 @@ function catIcon(c){return db.categoryIcons?.[c]||icons[c]||'📦'}
 function renderSummary(){$('categories').innerHTML=db.categories.map(c=>`<div class="row" style="padding:9px 0;border-bottom:1px solid #eef1ef"><span>${catIcon(c)} ${esc(c)}</span><b>${db.products.filter(p=>p.category===c).length}</b></div>`).join('')}
 function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
 function renderManage(){
-  $('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card manageCat" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b style="font-size:17px">${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon manage-icon" data-cat="${esc(c)}">🎨</button><button class="icon manage-rename" data-cat="${esc(c)}">✏️</button><button class="icon dangerBtn manage-delete" data-cat="${esc(c)}">🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon manage-product-rename" data-cat="${esc(c)}" data-product="${esc(p)}">✏️</button><button class="icon dangerBtn manage-product-delete" data-cat="${esc(c)}" data-product="${esc(p)}">🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary manage-add-product manageAdd" data-cat="${esc(c)}">➕ Bu kategoriye ürün ekle</button></div>`}).join('')}
+  $('manageCats').innerHTML=db.categories.map((c,ci)=>{let arr=db.catalog[c]||[];return `<div class="card manageCat" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b style="font-size:17px">${catIcon(c)} ${esc(c)}</b><div class="actions"><button type="button" class="icon manage-icon" data-ci="${ci}">🎨</button><button type="button" class="icon manage-rename" data-ci="${ci}">✏️</button><button type="button" class="icon dangerBtn manage-delete" data-ci="${ci}">🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map((p,pi)=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button type="button" class="icon manage-product-rename" data-ci="${ci}" data-pi="${pi}">✏️</button><button type="button" class="icon dangerBtn manage-product-delete" data-ci="${ci}" data-pi="${pi}">🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button type="button" class="secondary manage-add-product manageAdd" data-ci="${ci}">➕ Bu kategoriye ürün ekle</button></div>`}).join('');
+  $('manageCats').querySelectorAll('.manage-add-product').forEach(b=>b.onclick=()=>addCatalogProduct(db.categories[Number(b.dataset.ci)]));
+  $('manageCats').querySelectorAll('.manage-icon').forEach(b=>b.onclick=()=>openIconPicker(db.categories[Number(b.dataset.ci)],'existing'));
+  $('manageCats').querySelectorAll('.manage-rename').forEach(b=>b.onclick=()=>renameCat(db.categories[Number(b.dataset.ci)]));
+  $('manageCats').querySelectorAll('.manage-delete').forEach(b=>b.onclick=()=>deleteCat(db.categories[Number(b.dataset.ci)]));
+  $('manageCats').querySelectorAll('.manage-product-rename').forEach(b=>b.onclick=()=>{const ci=Number(b.dataset.ci),pi=Number(b.dataset.pi);renameProduct(db.categories[ci],(db.catalog[db.categories[ci]]||[])[pi])});
+  $('manageCats').querySelectorAll('.manage-product-delete').forEach(b=>b.onclick=()=>{const ci=Number(b.dataset.ci),pi=Number(b.dataset.pi);deleteCatalogProduct(db.categories[ci],(db.catalog[db.categories[ci]]||[])[pi])});
+}
 function openExpiryRange(min,max,title){expiryRange={min,max,title};show('products');renderProducts()}
 $('statAll').onclick=()=>{expiryRange=null;show('products');renderProducts()};
 $('stat30').onclick=()=>openExpiryRange(16,30,'SKT 30-16 gün kalan ürünler');
@@ -111,11 +132,15 @@ function renameCat(c){let n=prompt('Kategori adı:',c);if(!n||!(n=n.trim())||n==
 function deleteCat(c){if(db.categories.length<=1)return toast('En az bir kategori kalmalı');let count=db.products.filter(p=>p.category===c).length;if(count&&!confirm(`Bu kategoride ${count} stok kaydı var. Kategoriyi silersen stok kayıtları başka kategoriye taşınacak. Devam?`))return;let target=db.categories.find(x=>x!==c);db.products.forEach(p=>{if(p.category===c)p.category=target});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c)v.category=target});delete db.catalog[c];delete db.categoryIcons[c];db.categories=db.categories.filter(x=>x!==c);save();toast('Kategori silindi')}
 function addCatalogProduct(c){
   if(!db.categories.includes(c))return toast('Kategori bulunamadı');
-  window.pendingProductCategory=c;
-  $('productModalCat').textContent='Kategori: '+c;
-  $('manageProductName').value='';
-  $('productModal').classList.remove('hidden');
-  setTimeout(()=>$('manageProductName').focus(),100);
+  const n=prompt(`${c} kategorisine eklenecek ürünün adını yaz:`);
+  if(n===null)return;
+  const name=n.trim();
+  if(!name)return toast('Ürün adı gerekli');
+  if(!db.catalog[c])db.catalog[c]=[];
+  if(db.catalog[c].some(x=>x.toLowerCase()===name.toLowerCase()))return toast('Bu ürün zaten tanımlı');
+  db.catalog[c].push(name);save();
+  $('category').value=c;renderProductTemplate();$('productTemplate').value=name;
+  toast(`${name} ürünü ${c} kategorisine eklendi`);
 }
 function closeProductModal(){$('productModal').classList.add('hidden');window.pendingProductCategory=null;$('manageProductName').value=''}
 function saveCatalogProductFromModal(){
@@ -134,7 +159,6 @@ $('saveProductModal').onclick=saveCatalogProductFromModal;
 $('manageProductName').addEventListener('keydown',e=>{if(e.key==='Enter')saveCatalogProductFromModal();if(e.key==='Escape')closeProductModal()});
 function renameProduct(c,p){let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;let arr=db.catalog[c]||[];if(arr.includes(n))return toast('Bu ürün zaten var');arr[arr.indexOf(p)]=n;db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});save();toast('Ürün adı değiştirildi')}
 function deleteCatalogProduct(c,p){let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});save();toast('Ürün tanımından silindi')}
-$('manageCats').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!$('manageCats').contains(b))return;e.preventDefault();e.stopPropagation();const c=b.dataset.cat,p=b.dataset.product;if(b.classList.contains('manage-add-product'))return addCatalogProduct(c);if(b.classList.contains('manage-rename'))return renameCat(c);if(b.classList.contains('manage-delete'))return deleteCat(c);if(b.classList.contains('manage-product-rename'))return renameProduct(c,p);if(b.classList.contains('manage-product-delete'))return deleteCatalogProduct(c,p);if(b.classList.contains('manage-icon'))return openIconPicker(c,'existing')});
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
 let reader=null,controls=null;
 let zxingPromise=null;
