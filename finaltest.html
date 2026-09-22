@@ -19,7 +19,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 /* Login */
 #loginScreen{position:fixed;inset:0;background:linear-gradient(145deg,#087b55,#075a3e);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .loginBox{width:100%;max-width:390px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 18px 60px #0004}
-.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}
+.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}.branchBar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:11px;background:#ffffff16}.branchBar span{font-size:11px;opacity:.9;white-space:nowrap}.branchBar select{margin:0;flex:1;padding:8px 10px;border:0;border-radius:9px;background:#fff;color:var(--g2);font-weight:800;font-size:12px;min-width:0}.branchBar select:disabled{opacity:.9}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
@@ -37,7 +37,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
     </form>
   </div>
 </div>
-<header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div id="userBar" class="userBar"><span id="currentUserLabel">Oturum açılıyor...</span><button type="button" id="logoutBtn">Çıkış Yap</button></div><div class="stats">
+<header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div id="userBar" class="userBar"><span id="currentUserLabel">Oturum açılıyor...</span><button type="button" id="logoutBtn">Çıkış Yap</button></div><div id="branchBar" class="branchBar hidden"><span>🏢 Şube</span><select id="branchSwitcher" aria-label="Aktif şube"></select></div><div class="stats">
 <button class="stat statBtn" id="statAll"><b id="total">0</b><span>Toplam stok · tümü</span></button><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
 <div class="container"><nav>
 <button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="manage">⚙️<br>Yönetim</button></nav>
@@ -72,6 +72,7 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHA
 const APP_AUTH_KEY='barskt_auth_v1';
 let currentProfile=null;
 let branchesCache=[];
+let selectedBranchId=sessionStorage.getItem("barskt_selected_branch")||null;
 
 function setLoginBusy(busy){
   const btn=document.getElementById('loginBtn'), loading=document.getElementById('loginLoading');
@@ -92,12 +93,51 @@ function showApp(){
   if(label) label.textContent=`${name} · ${role==='admin'?'Admin':role==='yönetici'?'Yönetici':'Kullanıcı'}`;
   const manageNav=document.querySelector('nav button[data-page="manage"]');
   if(manageNav) manageNav.classList.toggle('hidden',role!=='admin');
+  loadBranchSwitcher();
 }
+async function loadBranchSwitcher(){
+  const bar=document.getElementById('branchBar');
+  const sel=document.getElementById('branchSwitcher');
+  if(!bar||!sel||!currentProfile)return;
+  const role=String(currentProfile.role||'').trim().toLowerCase();
+  if(role!=='admin' && role!=='yönetici' && role!=='kullanıcı'){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  if(!branchesCache.length){
+    const {data,error}=await supabaseClient.from('branches').select('id,name,is_active').eq('is_active',true).order('name');
+    if(error){bar.classList.add('hidden');toast('Şubeler yüklenemedi.');return;}
+    branchesCache=data||[];
+  }
+  let activeId=currentProfile.branch_id||selectedBranchId;
+  if(role==='kullanıcı'){
+    const own=branchesCache.find(b=>b.id===currentProfile.branch_id);
+    if(own) activeId=own.id;
+    selectedBranchId=activeId;
+    sessionStorage.setItem('barskt_selected_branch',activeId||'');
+    sel.innerHTML=own?`<option value="${own.id}">${esc(own.name)}</option>`:'<option>Şube tanımsız</option>';
+    sel.disabled=true;
+  }else{
+    if(!activeId || !branchesCache.some(b=>b.id===activeId)) activeId=branchesCache[0]?.id||null;
+    selectedBranchId=activeId;
+    if(activeId)sessionStorage.setItem('barskt_selected_branch',activeId);
+    sel.innerHTML=branchesCache.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    sel.value=activeId||'';
+    sel.disabled=false;
+    sel.onchange=()=>{
+      selectedBranchId=sel.value||null;
+      if(selectedBranchId)sessionStorage.setItem('barskt_selected_branch',selectedBranchId);else sessionStorage.removeItem('barskt_selected_branch');
+      const branch=branchesCache.find(b=>b.id===selectedBranchId);
+      toast(branch?`${branch.name} şubesi seçildi.`:'Şube seçilmedi.');
+    };
+  }
+}
+function getActiveBranch(){return branchesCache.find(b=>b.id===selectedBranchId)||branchesCache.find(b=>b.id===currentProfile?.branch_id)||null}
 function showLogin(){document.getElementById('loginScreen')?.classList.remove('hidden')}
 async function logout(){
   await supabaseClient.auth.signOut();
   currentProfile=null;
+  selectedBranchId=null;
   sessionStorage.removeItem(APP_AUTH_KEY);
+  sessionStorage.removeItem('barskt_selected_branch');
   document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!=='home'));
   document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page==='home'));
   showLogin();
