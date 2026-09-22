@@ -19,7 +19,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 /* Login */
 #loginScreen{position:fixed;inset:0;background:linear-gradient(145deg,#087b55,#075a3e);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .loginBox{width:100%;max-width:390px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 18px 60px #0004}
-.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}.branchBar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:11px;background:#ffffff16}.branchBar span{font-size:11px;opacity:.9;white-space:nowrap}.branchBar select{margin:0;flex:1;padding:8px 10px;border:0;border-radius:9px;background:#fff;color:var(--g2);font-weight:800;font-size:12px;min-width:0}.branchBar select:disabled{opacity:.9}
+.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userStat{background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;padding:10px}.userStat b{display:block;font-size:20px}.userStat span{font-size:11px;color:var(--muted)}.userRow{border:1px solid #e8eeea;border-radius:14px;padding:12px;margin-top:9px}.userRow .meta{font-size:11px;color:var(--muted);margin-top:3px}.userActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.roleBadge{padding:4px 7px;border-radius:20px;background:#e3f3ed;color:var(--g2);font-size:10px;font-weight:800}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}.branchBar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:11px;background:#ffffff16}.branchBar span{font-size:11px;opacity:.9;white-space:nowrap}.branchBar select{margin:0;flex:1;padding:8px 10px;border:0;border-radius:9px;background:#fff;color:var(--g2);font-weight:800;font-size:12px;min-width:0}.branchBar select:disabled{opacity:.9}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
@@ -58,9 +58,12 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
 <label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
 <label>Şifre<input id="newUserPassword" type="password" placeholder="En az 6 karakter" autocomplete="new-password" minlength="6" required></label>
-<label>Şube<select id="newUserBranch" required><option value="">Şube yükleniyor...</option></select></label>
+<label>Rol<select id="newUserRole"><option value="kullanıcı">👤 Kullanıcı</option><option value="yönetici">🧑‍💼 Yönetici</option><option value="admin">👑 Admin</option></select></label>
+<label>Şube<select id="newUserBranch"><option value="">Şube seç...</option></select></label>
+<div id="newUserRoleNote" class="productSelectNote">Kullanıcı seçildiğinde yalnızca seçilen şubeye erişir.</div>
 <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
 </form></div>
+<div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
 <div class="card" id="adminDataCard"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
 
@@ -253,72 +256,105 @@ function renderManage(){
     return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon" onclick='renameCat(${jsarg(c)})'>✏️</button><button class="icon dangerBtn" onclick='deleteCat(${jsarg(c)})'>🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick='renameProduct(${jsarg(c)},${jsarg(p)})'>✏️</button><button class="icon" title="Başka kategoriye taşı" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)})'>↗️</button><button class="icon dangerBtn" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)})'>🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button></div>`;
   }).join('') : '';
   const card=$('userManagementCard');
+  const usersCard=$('usersListCard');
   if(!card)return;
   card.classList.toggle('hidden',!isAdmin);
-  if(isAdmin) loadBranchesForUserForm();
+  usersCard?.classList.toggle('hidden',!isAdmin);
+  if(isAdmin){ loadBranchesForUserForm(); loadUsers(); updateUserRoleForm(); }
+}
+
+function roleLabel(role){return role==='admin'?'👑 Admin':role==='yönetici'?'🧑‍💼 Yönetici':'👤 Kullanıcı'}
+function updateUserRoleForm(){
+  const role=$('newUserRole')?.value||'kullanıcı';
+  const sel=$('newUserBranch'),note=$('newUserRoleNote');
+  const needsBranch=role==='kullanıcı';
+  if(sel){sel.disabled=!needsBranch;sel.required=needsBranch;if(!needsBranch)sel.value='';}
+  if(note)note.textContent=role==='kullanıcı'?'Kullanıcı yalnızca seçilen şubeye erişir.':role==='yönetici'?'Yönetici tüm şubeleri görebilir ve şube değiştirebilir.':'Admin tüm şubeleri ve sistem yönetimini görebilir.';
 }
 
 async function loadBranchesForUserForm(){
   const sel=$('newUserBranch');
   if(!sel || currentProfile?.role!=='admin')return;
-  if(branchesCache.length){
-    sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
-    return;
+  if(!branchesCache.length){
+    const {data,error}=await supabaseClient.from('branches').select('id,name,is_active').order('name');
+    if(error){sel.innerHTML='<option value="">Şubeler yüklenemedi</option>';toast('Şubeler yüklenemedi.');return;}
+    branchesCache=data||[];
   }
-  sel.innerHTML='<option value="">Şubeler yükleniyor...</option>';
-  const {data,error}=await supabaseClient.from('branches').select('id,name,is_active').order('name');
-  if(error){
-    sel.innerHTML='<option value="">Şubeler yüklenemedi</option>';
-    toast('Şubeler yüklenemedi.');
-    return;
-  }
-  branchesCache=data||[];
   sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  updateUserRoleForm();
+}
+
+async function loadUsers(){
+  if(currentProfile?.role!=='admin')return;
+  const list=$('usersList'),stats=$('userStats');
+  if(!list)return;
+  list.innerHTML='<div class="empty">Kullanıcılar yükleniyor...</div>';
+  const {data,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id,is_active,created_at').order('created_at',{ascending:false});
+  if(error){list.innerHTML='<div class="empty">Kullanıcılar okunamadı.</div>';toast('Kullanıcı listesi yüklenemedi.');return;}
+  const users=data||[];
+  const counts={admin:0,yönetici:0,kullanıcı:0};users.forEach(u=>{if(counts[u.role]!=null)counts[u.role]++});
+  if(stats)stats.innerHTML=`<div class="userStat"><b>${users.length}</b><span>Toplam kullanıcı</span></div><div class="userStat"><b>${counts.admin}</b><span>Admin</span></div><div class="userStat"><b>${counts.yönetici}</b><span>Yönetici</span></div><div class="userStat"><b>${counts.kullanıcı}</b><span>Kullanıcı</span></div>`;
+  const branchName=id=>branchesCache.find(b=>b.id===id)?.name||'Şube yok / tüm şubeler';
+  list.innerHTML=users.map(u=>{
+    const safeId=jsarg(u.id);
+    const branch=u.role==='kullanıcı'?branchName(u.branch_id):'Tüm şubeler';
+    const status=u.is_active?'Aktif':'Pasif';
+    return `<div class="userRow"><div class="row"><div><b>${esc(u.full_name)}</b><div class="meta">Giriş adı: <b>${esc(u.username||'-')}</b> · ${esc(branch)}</div></div><span class="roleBadge">${roleLabel(u.role)}</span></div><div class="meta">Durum: ${status}</div><div class="userActions"><button class="secondary" onclick='editUser(${safeId})'>✏️ Düzenle</button><button class="secondary" onclick='resetUserPassword(${safeId})'>🔑 Şifre değiştir</button>${u.id!==currentProfile?.id?`<button class="secondary dangerBtn" onclick='deleteUser(${safeId},${jsarg(u.full_name)})'>🗑️ Sil</button>`:''}</div></div>`;
+  }).join('')||'<div class="empty">Henüz kullanıcı yok.</div>';
+}
+
+async function adminAction(payload){
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session?.access_token)throw new Error('Oturum bulunamadı.');
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/Create-user`,{method:'POST',headers:{'Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  let result=null;try{result=await response.json()}catch(_){}
+  if(!response.ok||!result?.success)throw new Error(result?.error||result?.message||`Sunucu hatası (${response.status})`);
+  return result;
 }
 
 async function createUserFromAdmin(e){
   e.preventDefault();
   if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
-  const fullName=$('newUserFullName').value.trim();
-  const username=$('newUserUsername').value.trim().toLowerCase();
-  const password=$('newUserPassword').value;
-  const branchId=$('newUserBranch').value;
-  if(!fullName||!username||!password||!branchId)return toast('Ad soyad, kullanıcı adı, şifre ve şube zorunludur.');
+  const fullName=$('newUserFullName').value.trim(),username=$('newUserUsername').value.trim().toLowerCase(),password=$('newUserPassword').value,role=$('newUserRole').value,branchId=$('newUserBranch').value;
+  if(!fullName||!username||!password)return toast('Ad soyad, kullanıcı adı ve şifre zorunludur.');
   if(password.length<6)return toast('Şifre en az 6 karakter olmalıdır.');
-  const btn=$('createUserBtn'),msg=$('userCreateMsg');
-  btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
+  if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+  const btn=$('createUserBtn'),msg=$('userCreateMsg');btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
   try{
-    const {data:{session}}=await supabaseClient.auth.getSession();
-    if(!session?.access_token)throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
-
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/Create-user`,{
-      method:'POST',
-      headers:{
-        'Authorization':`Bearer ${session.access_token}`,
-        'apikey':SUPABASE_PUBLISHABLE_KEY,
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({full_name:fullName,username,password,branch_id:branchId})
-    });
-
-    let result=null;
-    try{result=await response.json()}catch(_){}
-    if(!response.ok){
-      const detail=result?.error||result?.message||`Sunucu hatası (${response.status})`;
-      throw new Error(detail);
-    }
-    if(!result?.success)throw new Error(result?.error||'Kullanıcı oluşturulamadı.');
-    $('createUserForm').reset();
-    $('newUserBranch').value='';
-    msg.textContent='Kullanıcı oluşturuldu ✓';
-    toast(`${fullName} kullanıcısı oluşturuldu.`);
-  }catch(err){
-    msg.textContent='';
-    toast(err?.message||'Kullanıcı oluşturulamadı.');
-  }finally{
-    btn.disabled=false;btn.style.opacity='1';
-  }
+    await adminAction({action:'create',full_name:fullName,username,password,role,branch_id:role==='kullanıcı'?branchId:null});
+    $('createUserForm').reset();$('newUserRole').value='kullanıcı';$('newUserBranch').value='';updateUserRoleForm();msg.textContent='Kullanıcı oluşturuldu ✓';toast(`${fullName} · ${roleLabel(role)} oluşturuldu.`);await loadUsers();
+  }catch(err){msg.textContent='';toast(err?.message||'Kullanıcı oluşturulamadı.')}finally{btn.disabled=false;btn.style.opacity='1'}
 }
+
+async function editUser(id){
+  const {data:u,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id').eq('id',id).single();
+  if(error||!u)return toast('Kullanıcı bulunamadı.');
+  const full=prompt('Ad Soyad:',u.full_name);if(full===null)return;
+  const username=prompt('Kullanıcı adı:',u.username||'');if(username===null)return;
+  const roleInput=prompt('Rol yaz: admin / yönetici / kullanıcı',u.role);if(roleInput===null)return;
+  const role=roleInput.trim().toLowerCase();if(!['admin','yönetici','kullanıcı'].includes(role))return toast('Geçersiz rol.');
+  let branchId=null;
+  if(role==='kullanıcı'){
+    const names=branchesCache.filter(b=>b.is_active).map(b=>b.name).join(', ');
+    const branchNameInput=prompt(`Kullanıcı için şube adı (${names}):`,branchesCache.find(b=>b.id===u.branch_id)?.name||'');if(branchNameInput===null)return;
+    const br=branchesCache.find(b=>b.is_active&&b.name.toLowerCase()===branchNameInput.trim().toLowerCase());if(!br)return toast('Geçerli bir şube adı gir.');branchId=br.id;
+  }
+  if(!full.trim()||!username.trim())return toast('Ad soyad ve kullanıcı adı boş olamaz.');
+  try{await adminAction({action:'update',user_id:id,full_name:full.trim(),username:username.trim().toLowerCase(),role,branch_id:branchId});toast('Kullanıcı bilgileri güncellendi.');await loadUsers();}catch(err){toast(err?.message||'Kullanıcı güncellenemedi.')}
+}
+
+async function resetUserPassword(id){
+  const p=prompt('Yeni şifre (en az 6 karakter):','');if(p===null)return;if(p.length<6)return toast('Şifre en az 6 karakter olmalı.');
+  try{await adminAction({action:'reset_password',user_id:id,password:p});toast('Şifre değiştirildi.');}catch(err){toast(err?.message||'Şifre değiştirilemedi.')}
+}
+
+async function deleteUser(id,name){
+  if(!confirm(`${name} kullanıcısı tamamen silinsin mi? Bu işlem giriş hesabını ve profilini kaldırır.`))return;
+  try{await adminAction({action:'delete',user_id:id});toast(`${name} silindi.`);await loadUsers();}catch(err){toast(err?.message||'Kullanıcı silinemedi.')}
+}
+
+$('newUserRole')?.addEventListener('change',updateUserRoleForm);
+$('refreshUsers')?.addEventListener('click',loadUsers);
 
 function openExpiryRange(min,max,title){expiryRange={min,max,title};show('products');renderProducts()}
 $('statAll').onclick=()=>{expiryRange=null;show('products');renderProducts()};
