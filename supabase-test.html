@@ -58,9 +58,20 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
 <label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
 <label>Şifre<input id="newUserPassword" type="password" placeholder="En az 6 karakter" autocomplete="new-password" minlength="6" required></label>
-<label>Şube<select id="newUserBranch" required><option value="">Şube yükleniyor...</option></select></label>
+<label>Rol<select id="newUserRole" required>
+<option value="kullanıcı">👤 Kullanıcı</option>
+<option value="yönetici">🧑‍💼 Yönetici</option>
+<option value="admin">👑 Admin</option>
+</select></label>
+<label>Şube<select id="newUserBranch"><option value="">Şube seç...</option></select></label>
+<div id="adminBranchNote" class="muted" style="margin-top:7px;display:none">Admin ve Yönetici için şube seçilmez; bu roller tüm şubeleri görebilir.</div>
 <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
 </form></div>
+<div class="card" id="usersListCard">
+  <div class="row"><b>👥 Kayıtlı Kullanıcılar</b><button class="secondary" type="button" id="refreshUsers">↻ Yenile</button></div>
+  <div class="muted" style="margin-top:6px">Sistemde kayıtlı kullanıcıları buradan görebilir, düzenleyebilir, şifrelerini değiştirebilir veya silebilirsin.</div>
+  <div id="usersAdminList" style="margin-top:12px"><div class="empty">Kullanıcılar yükleniyor...</div></div>
+</div>
 <div class="card"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
 
@@ -72,8 +83,6 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHA
 const APP_AUTH_KEY='barskt_auth_v1';
 let currentProfile=null;
 let branchesCache=[];
-let catalogCategoryRows=[];
-let catalogProductRows=[];
 
 function setLoginBusy(busy){
   const btn=document.getElementById('loginBtn'), loading=document.getElementById('loginLoading');
@@ -108,14 +117,14 @@ async function initAuth(){
   const form=document.getElementById('loginForm');
   form?.addEventListener('submit',async e=>{
     e.preventDefault();hideLoginError();setLoginBusy(true);
-    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);showApp();await initCatalog();render();toast('Hoş geldin 👋');}
+    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);showApp();render();toast('Hoş geldin 👋');}
     catch(err){showLoginError(err?.message||'Giriş yapılamadı.');}
     finally{setLoginBusy(false)}
   });
   const {data:{session}}=await supabaseClient.auth.getSession();
   if(session?.user){
     const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
-    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();await initCatalog();render();return;}
+    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();render();return;}
     await supabaseClient.auth.signOut();
   }
   showLogin();
@@ -157,83 +166,6 @@ function catIcon(c){return db.categoryIcons[c]||defaultIcons[c]||'📦'}
 db.products.forEach(p=>{if(p.barcode&&p.name&&p.category){db.barcodeMap[p.barcode.trim()]={category:p.category,name:p.name}}});
 Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categories.push(c);if(!db.catalog[c])db.catalog[c]=[];ps.forEach(p=>{if(!db.catalog[c].includes(p))db.catalog[c].push(p)})});
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
-
-async function migrateLocalCatalogToSupabase(){
-  const {data:existingCats,error:catError}=await supabaseClient.from('categories').select('id,name,icon,is_active').order('name');
-  if(catError) throw new Error('Kategori verileri okunamadı: '+catError.message);
-  const existingByName=new Map((existingCats||[]).map(c=>[c.name,c]));
-
-  for(const name of db.categories){
-    if(!existingByName.has(name)){
-      const {data:created,error}=await supabaseClient.from('categories').insert({name,icon:catIcon(name),is_active:true}).select('id,name,icon,is_active').single();
-      if(error){
-        if(error.code==='23505') continue;
-        throw new Error('Kategori aktarımı başarısız: '+error.message);
-      }
-      existingByName.set(name,created);
-    }
-  }
-
-  for(const category of db.categories){
-    const cat=existingByName.get(category);
-    if(!cat) continue;
-    const names=db.catalog[category]||[];
-    const {data:existingProducts,error:productError}=await supabaseClient.from('products').select('id,name,category_id').eq('category_id',cat.id);
-    if(productError) throw new Error('Ürün verileri okunamadı: '+productError.message);
-    const existingNames=new Set((existingProducts||[]).map(p=>p.name.toLowerCase()));
-    for(const name of names){
-      if(existingNames.has(name.toLowerCase())) continue;
-      const {error}=await supabaseClient.from('products').insert({category_id:cat.id,name,unit:'Adet',is_active:true});
-      if(error && error.code!=='23505') throw new Error('Ürün aktarımı başarısız: '+error.message);
-      existingNames.add(name.toLowerCase());
-    }
-  }
-}
-
-async function loadCatalogFromSupabase(){
-  const {data:cats,error:catError}=await supabaseClient.from('categories').select('id,name,icon,is_active').eq('is_active',true).order('name');
-  if(catError) throw new Error('Kategoriler yüklenemedi: '+catError.message);
-
-  // İlk geçişte mevcut V8.5 LocalStorage kataloğunu Supabase'e taşır.
-  if(!(cats||[]).length && db.categories.length){
-    await migrateLocalCatalogToSupabase();
-  }else{
-    // Supabase'de eksik olan eski LocalStorage kayıtlarını da kaybetmeden aktar.
-    const existingNames=new Set((cats||[]).map(c=>c.name));
-    const missing=db.categories.filter(c=>!existingNames.has(c));
-    if(missing.length) await migrateLocalCatalogToSupabase();
-  }
-
-  const {data:finalCats,error:finalCatError}=await supabaseClient.from('categories').select('id,name,icon,is_active').eq('is_active',true).order('name');
-  if(finalCatError) throw new Error('Kategoriler yenilenemedi: '+finalCatError.message);
-  const activeCatIds=(finalCats||[]).map(c=>c.id);
-  let products=[];
-  if(activeCatIds.length){
-    const {data,error}=await supabaseClient.from('products').select('id,name,category_id,barcode,unit,is_active').eq('is_active',true).in('category_id',activeCatIds).order('name');
-    if(error) throw new Error('Ürünler yüklenemedi: '+error.message);
-    products=data||[];
-  }
-
-  catalogCategoryRows=finalCats||[];
-  catalogProductRows=products;
-  db.categories=catalogCategoryRows.map(c=>c.name);
-  db.catalog={};
-  db.categoryIcons={};
-  catalogCategoryRows.forEach(c=>{db.catalog[c.name]=[];db.categoryIcons[c.name]=c.icon||'📦'});
-  catalogProductRows.forEach(p=>{const c=catalogCategoryRows.find(x=>x.id===p.category_id);if(c){db.catalog[c.name].push(p.name)}});
-  localStorage.setItem(KEY,JSON.stringify(db));
-}
-
-async function initCatalog(){
-  try{
-    await loadCatalogFromSupabase();
-    return true;
-  }catch(err){
-    console.error(err);
-    toast(err?.message||'Katalog yüklenemedi.');
-    return false;
-  }
-}
 const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function days(p){return Math.ceil((new Date(p.expiry+'T23:59:59')-new Date())/86400000)}
 function level(p){let d=days(p);if(d<0)return ['danger','GEÇMİŞ'];if(d===0)return ['danger','BUGÜN'];if(d<=5)return ['danger',d+' gün · 5 gün uyarısı'];if(d<=15)return ['warn',d+' gün · 15 gün uyarısı'];if(d<=30)return ['blue',d+' gün · 30 gün uyarısı'];return ['ok',d+' gün']}
@@ -253,11 +185,84 @@ function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').valu
 function jsarg(v){return JSON.stringify(v).replace(/'/g,'&#39;')}
 function renderManage(){
   $('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon" onclick='renameCat(${jsarg(c)})'>✏️</button><button class="icon dangerBtn" onclick='deleteCat(${jsarg(c)})'>🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick='renameProduct(${jsarg(c)},${jsarg(p)})'>✏️</button><button class="icon" title="Başka kategoriye taşı" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)})'>↗️</button><button class="icon dangerBtn" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)})'>🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button></div>`}).join('');
-  const card=$('userManagementCard');
+  const card=$('userManagementCard'), usersCard=$('usersListCard');
   if(!card)return;
   const isAdmin=currentProfile?.role==='admin';
   card.classList.toggle('hidden',!isAdmin);
-  if(isAdmin) loadBranchesForUserForm();
+  usersCard?.classList.toggle('hidden',!isAdmin);
+  if(isAdmin){loadBranchesForUserForm();loadUsers();updateUserRoleForm();}
+}
+
+async function loadUsers(){
+  if(currentProfile?.role!=='admin')return;
+  const list=$('usersAdminList'); if(!list)return;
+  list.innerHTML='<div class="empty">Kullanıcılar yükleniyor...</div>';
+  const {data,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id,is_active,created_at').order('full_name');
+  if(error){list.innerHTML='<div class="empty">Kullanıcılar okunamadı.</div>';toast('Kullanıcılar yüklenemedi: '+(error.message||''));return;}
+  const branches=branchesCache.length?branchesCache:(await supabaseClient.from('branches').select('id,name,is_active').order('name')).data||[];
+  branchesCache=branches;
+  const branchName=id=>branches.find(b=>b.id===id)?.name||'—';
+  const roleText=r=>r==='admin'?'👑 Admin':r==='yönetici'?'🧑‍💼 Yönetici':'👤 Kullanıcı';
+  const roleClass=r=>r==='admin'?'blue':r==='yönetici'?'warn':'ok';
+  list.innerHTML=(data||[]).map(u=>`
+    <div class="card" style="box-shadow:none;border:1px solid #e8eeea;padding:12px;margin:8px 0">
+      <div class="row">
+        <div style="min-width:0"><b>${esc(u.full_name)}</b><div class="muted" style="margin-top:3px">@${esc(u.username||'—')} · ${u.branch_id?esc(branchName(u.branch_id)):'Tüm şubeler'}</div></div>
+        <span class="pill ${roleClass(u.role)}">${roleText(u.role)}</span>
+      </div>
+      <div class="row" style="margin-top:8px"><span class="muted">${u.is_active?'🟢 Aktif':'🔴 Pasif'}</span><div class="actions"><button class="secondary" onclick='editUser(${jsarg(u.id)})'>✏️ Düzenle</button><button class="secondary" onclick='resetUserPassword(${jsarg(u.id)})'>🔑 Şifre</button><button class="secondary dangerBtn" onclick='deleteUser(${jsarg(u.id)},${jsarg(u.full_name)})'>🗑️ Sil</button></div></div>
+    </div>`).join('')||'<div class="empty">Henüz kullanıcı yok.</div>';
+}
+
+async function adminAction(payload){
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session?.access_token)throw new Error('Oturum bulunamadı.');
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/Create-user`,{method:'POST',headers:{'Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  let result=null;try{result=await response.json()}catch(_){}
+  if(!response.ok||!result?.success)throw new Error(result?.error||result?.message||`Sunucu hatası (${response.status})`);
+  return result;
+}
+
+async function editUser(id){
+  if(currentProfile?.role!=='admin')return;
+  const {data,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id,is_active').eq('id',id).single();
+  if(error||!data)return toast('Kullanıcı bilgisi okunamadı.');
+  const modal=document.createElement('div'); modal.id='editUserModal';
+  const branchOptions=branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="width:100%;max-width:430px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 15px 40px #0005;max-height:90vh;overflow:auto">
+    <div style="font-size:19px;font-weight:800">Kullanıcı düzenle</div>
+    <label>Ad Soyad<input id="editUserFullName" value="${esc(data.full_name)}"></label>
+    <label>Kullanıcı adı<input id="editUserUsername" value="${esc(data.username||'')}" autocapitalize="none"></label>
+    <label>Rol<select id="editUserRole"><option value="kullanıcı">👤 Kullanıcı</option><option value="yönetici">🧑‍💼 Yönetici</option><option value="admin">👑 Admin</option></select></label>
+    <label>Şube<select id="editUserBranch"><option value="">Şube seç...</option>${branchOptions}</select></label>
+    <div id="editUserNote" class="muted" style="margin-top:7px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="secondary" id="editUserCancel">Vazgeç</button><button class="primary" id="editUserSave">Kaydet</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  const roleSel=$('editUserRole'), branchSel=$('editUserBranch'), note=$('editUserNote');
+  roleSel.value=data.role; branchSel.value=data.branch_id||'';
+  const sync=()=>{const all=roleSel.value==='admin'||roleSel.value==='yönetici';branchSel.disabled=all;branchSel.required=!all;if(all)branchSel.value='';note.textContent=roleSel.value==='admin'?'Admin tüm şubeleri yönetebilir.':roleSel.value==='yönetici'?'Yönetici tüm şubeleri görebilir.':'Kullanıcı yalnızca seçilen şubeye erişir.'};
+  roleSel.onchange=sync;sync();
+  const close=()=>modal.remove();$('editUserCancel').onclick=close;modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  $('editUserSave').onclick=async()=>{
+    const full=$('editUserFullName').value.trim(),username=$('editUserUsername').value.trim().toLowerCase(),role=roleSel.value,branchId=role==='kullanıcı'?branchSel.value:null;
+    if(!full||!username)return toast('Ad soyad ve kullanıcı adı boş olamaz.');
+    if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+    const btn=$('editUserSave');btn.disabled=true;
+    try{await adminAction({action:'update',user_id:id,full_name:full,username,role,branch_id:branchId});close();toast('Kullanıcı bilgileri güncellendi.');await loadUsers();}catch(err){toast(err?.message||'Kullanıcı güncellenemedi.');btn.disabled=false}
+  };
+}
+
+async function resetUserPassword(id){
+  const p=prompt('Yeni şifre (en az 6 karakter):','');if(p===null)return;if(p.length<6)return toast('Şifre en az 6 karakter olmalı.');
+  try{await adminAction({action:'reset_password',user_id:id,password:p});toast('Şifre değiştirildi.');}catch(err){toast(err?.message||'Şifre değiştirilemedi.')}
+}
+
+async function deleteUser(id,name){
+  if(id===currentProfile?.id)return toast('Kendi hesabını buradan silemezsin.');
+  if(!confirm(`${name} kullanıcısı tamamen silinsin mi? Bu işlem giriş hesabını ve profilini kaldırır.`))return;
+  try{await adminAction({action:'delete',user_id:id});toast(`${name} silindi.`);await loadUsers();}catch(err){toast(err?.message||'Kullanıcı silinemedi.')}
 }
 
 async function loadBranchesForUserForm(){
@@ -265,6 +270,7 @@ async function loadBranchesForUserForm(){
   if(!sel || currentProfile?.role!=='admin')return;
   if(branchesCache.length){
     sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    updateUserRoleForm();
     return;
   }
   sel.innerHTML='<option value="">Şubeler yükleniyor...</option>';
@@ -276,27 +282,94 @@ async function loadBranchesForUserForm(){
   }
   branchesCache=data||[];
   sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  updateUserRoleForm();
+}
+
+function updateUserRoleForm(){
+  const role=$('newUserRole')?.value||'kullanıcı';
+  const branch=$('newUserBranch');
+  const note=$('adminBranchNote');
+  const btn=$('createUserBtn');
+  const allBranches=role==='admin'||role==='yönetici';
+
+  if(branch){
+    branch.required=!allBranches;
+    branch.disabled=allBranches;
+    if(allBranches) branch.value='';
+  }
+
+  if(note){
+    note.style.display=allBranches?'block':'none';
+    note.textContent=role==='admin'
+      ? 'Admin için şube seçilmez; Admin tüm şubeleri yönetebilir.'
+      : 'Yönetici için şube seçilmez; Yönetici tüm şubeleri görebilir.';
+  }
+
+  if(btn){
+    btn.textContent=role==='admin'
+      ? '👑 Admin oluştur'
+      : role==='yönetici'
+        ? '🧑‍💼 Yönetici oluştur'
+        : '👤 Kullanıcı oluştur';
+  }
 }
 
 async function createUserFromAdmin(e){
   e.preventDefault();
   if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+
   const fullName=$('newUserFullName').value.trim();
   const username=$('newUserUsername').value.trim().toLowerCase();
   const password=$('newUserPassword').value;
+  const role=$('newUserRole').value;
   const branchId=$('newUserBranch').value;
-  if(!fullName||!username||!password||!branchId)return toast('Ad soyad, kullanıcı adı, şifre ve şube zorunludur.');
+
+  if(!fullName||!username||!password)return toast('Ad soyad, kullanıcı adı ve şifre zorunludur.');
   if(password.length<6)return toast('Şifre en az 6 karakter olmalıdır.');
+  if(!['admin','yönetici','kullanıcı'].includes(role))return toast('Geçersiz rol.');
+  if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+
   const btn=$('createUserBtn'),msg=$('userCreateMsg');
   btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
+
   try{
-    const {data,error}=await supabaseClient.functions.invoke('create-user',{body:{full_name:fullName,username,password,branch_id:branchId}});
-    if(error)throw new Error(error.message||'Kullanıcı oluşturulamadı.');
-    if(!data?.success)throw new Error(data?.error||'Kullanıcı oluşturulamadı.');
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    if(!session?.access_token)throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/Create-user`,{
+      method:'POST',
+      headers:{
+        'Authorization':`Bearer ${session.access_token}`,
+        'apikey':SUPABASE_PUBLISHABLE_KEY,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        full_name:fullName,
+        username,
+        password,
+        role,
+        branch_id:role==='kullanıcı'?branchId:null
+      })
+    });
+
+    let result=null;
+    try{result=await response.json()}catch(_){}
+    if(!response.ok){
+      const detail=result?.error||result?.message||`Sunucu hatası (${response.status})`;
+      const extra=result?.detail?` — ${result.detail}`:'';
+      throw new Error(detail+extra);
+    }
+    if(!result?.success)throw new Error(result?.error||'Kullanıcı oluşturulamadı.');
+
     $('createUserForm').reset();
     $('newUserBranch').value='';
+    $('newUserRole').value='kullanıcı';
+    updateUserRoleForm();
+
     msg.textContent='Kullanıcı oluşturuldu ✓';
-    toast(`${fullName} kullanıcısı oluşturuldu.`);
+    const roleText=role==='admin'?'Admin':role==='yönetici'?'Yönetici':'Kullanıcı';
+    toast(`${fullName} · ${roleText} oluşturuldu.`);
+    await loadUsers();
   }catch(err){
     msg.textContent='';
     toast(err?.message||'Kullanıcı oluşturulamadı.');
@@ -318,7 +391,9 @@ $('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange
 $('save').onclick=()=>{let cat=$('category').value,name=$('productTemplate').value,exp=$('expiry').value;if(!cat||!name||!exp)return toast('Kategori, ürün ve SKT gerekli');let code=$('barcode').value.trim();let data={name,category:cat,expiry:exp,qty:Number($('qty').value)||0,unit:$('unit').value,barcode:code,note:$('note').value.trim()};if(code){db.barcodeMap[code]={category:cat,name:name}}if(db.editId){let p=db.products.find(x=>x.id===db.editId);if(p)Object.assign(p,data);toast(code?'Stok kaydı güncellendi · barkod ürüne tanımlandı':'Stok kaydı güncellendi')}else{db.products.push({...data,id:crypto.randomUUID()});toast(code?'Stok kaydı eklendi · barkod ürüne tanımlandı':'Stok kaydı eklendi')}save();resetForm();show('products')}
 $('cancelEdit').onclick=()=>{resetForm();show('products')};
 $('newCategoryInline').onclick=()=>{addCat()};$('newProductInline').onclick=()=>{let c=$('category').value;if(c)addCatalogProduct(c);else toast('Önce kategori seç')};$('addCat').onclick=addCat;
+$('newUserRole')?.addEventListener('change',updateUserRoleForm);
 $('createUserForm')?.addEventListener('submit',createUserFromAdmin);
+$('refreshUsers')?.addEventListener('click',loadUsers);
 function openCategoryModal(mode,c){
   let old=document.getElementById('categoryModal'); if(old)old.remove();
   const isEdit=mode==='edit'; const currentIcon=isEdit?catIcon(c):'📦';
@@ -335,54 +410,21 @@ function openCategoryModal(mode,c){
   const input=document.getElementById('categoryNameInput'), preview=document.getElementById('catIconPreview'); let selected=currentIcon;
   modal.querySelectorAll('.emojiBtn').forEach(btn=>btn.onclick=()=>{selected=iconChoices[Number(btn.dataset.iconIndex)];modal.querySelectorAll('.emojiBtn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');preview.textContent=selected});
   const close=()=>modal.remove(); document.getElementById('categoryCancel').onclick=close;
-  document.getElementById('categorySave').onclick=async()=>{
+  document.getElementById('categorySave').onclick=()=>{
     let n=(input.value||'').trim(); if(!n)return toast('Kategori adı gerekli');
-    const saveBtn=document.getElementById('categorySave'); saveBtn.disabled=true;
-    try{
-      if(!isEdit){
-        if(catalogCategoryRows.some(x=>x.name.toLowerCase()===n.toLowerCase()))return toast('Bu kategori zaten var');
-        const {data,error}=await supabaseClient.from('categories').insert({name:n,icon:selected,is_active:true}).select('id,name,icon,is_active').single();
-        if(error)throw error;
-        catalogCategoryRows.push(data);
-        db.categories.push(n); db.catalog[n]=[]; db.categoryIcons[n]=selected;
-        localStorage.setItem(KEY,JSON.stringify(db)); close(); render(); $('category').value=n; renderProductTemplate(); toast('Kategori oluşturuldu');
-      }else{
-        if(n!==c && catalogCategoryRows.some(x=>x.name.toLowerCase()===n.toLowerCase()))return toast('Bu kategori zaten var');
-        const row=catalogCategoryRows.find(x=>x.name===c); if(!row)return toast('Kategori bulunamadı');
-        const {error}=await supabaseClient.from('categories').update({name:n,icon:selected}).eq('id',row.id); if(error)throw error;
-        db.products.forEach(p=>{if(p.category===c)p.category=n});
-        db.categories=db.categories.map(x=>x===c?n:x);
-        db.catalog[n]=db.catalog[c]||[]; delete db.catalog[c];
-        db.categoryIcons[n]=selected; delete db.categoryIcons[c];
-        catalogCategoryRows=catalogCategoryRows.map(x=>x.id===row.id?{...x,name:n,icon:selected}:x);
-        localStorage.setItem(KEY,JSON.stringify(db)); close(); render(); toast('Kategori ve simgesi güncellendi');
-      }
-    }catch(err){toast(err?.message||'Kategori kaydedilemedi.');saveBtn.disabled=false}
+    if(!isEdit){ if(db.categories.includes(n))return toast('Bu kategori zaten var'); db.categories.push(n); db.catalog[n]=[]; db.categoryIcons[n]=selected; save(); $('category').value=n; renderProductTemplate(); close(); toast('Kategori oluşturuldu'); }
+    else { if(n!==c && db.categories.includes(n))return toast('Bu kategori zaten var');
+      let i=db.categories.indexOf(c); if(i<0)return close(); db.categories[i]=n; db.catalog[n]=db.catalog[c]||[]; delete db.catalog[c];
+      db.products.forEach(p=>{if(p.category===c)p.category=n});
+      if(db.categoryIcons[c]){db.categoryIcons[n]=selected;delete db.categoryIcons[c]}else db.categoryIcons[n]=selected;
+      Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=n});
+      save(); close(); toast('Kategori ve simgesi güncellendi'); }
   };
   modal.addEventListener('click',e=>{if(e.target===modal)close()}); setTimeout(()=>input.focus(),50);
 }
 function addCat(){openCategoryModal('add')}
 function renameCat(c){openCategoryModal('edit',c)}
-async function deleteCat(c){
-  if(db.categories.length<=1)return toast('En az bir kategori kalmalı');
-  let target=db.categories.find(x=>x!==c);if(!target)return;
-  const sourceRow=catalogCategoryRows.find(x=>x.name===c),targetRow=catalogCategoryRows.find(x=>x.name===target);if(!sourceRow||!targetRow)return toast('Kategori bulunamadı');
-  const sourceProducts=catalogProductRows.filter(x=>x.category_id===sourceRow.id);
-  if(!confirm(`"${c}" kategorisi ve içindeki ${sourceProducts.length} ürün ${target} kategorisine taşınacak. Mevcut stok kayıtları korunacak. Devam?`))return;
-  try{
-    for(const pr of sourceProducts){
-      const exists=(catalogProductRows||[]).some(x=>x.category_id===targetRow.id&&x.name.toLowerCase()===pr.name.toLowerCase());
-      if(exists) throw new Error(`"${pr.name}" ürünü hedef kategoride zaten var.`);
-      const {error}=await supabaseClient.from('products').update({category_id:targetRow.id}).eq('id',pr.id);if(error)throw error;
-    }
-    const {error:catError}=await supabaseClient.from('categories').delete().eq('id',sourceRow.id);if(catError)throw catError;
-    db.products.forEach(p=>{if(p.category===c)p.category=target});
-    db.catalog[target]=[...(db.catalog[target]||[]),...(db.catalog[c]||[])];delete db.catalog[c];delete db.categoryIcons[c];db.categories=db.categories.filter(x=>x!==c);
-    Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=target});
-    catalogProductRows=catalogProductRows.map(x=>x.category_id===sourceRow.id?{...x,category_id:targetRow.id}:x).filter(x=>x.category_id!==sourceRow.id);
-    catalogCategoryRows=catalogCategoryRows.filter(x=>x.id!==sourceRow.id);localStorage.setItem(KEY,JSON.stringify(db));render();toast('Kategori silindi ve ürünleri hedef kategoriye taşındı');
-  }catch(err){toast(err?.message||'Kategori silinemedi. Değişiklikler kontrol edilmeli.')}
-}
+function deleteCat(c){if(db.categories.length<=1)return toast('En az bir kategori kalmalı');let count=db.products.filter(p=>p.category===c).length;if(count&&!confirm(`Bu kategoride ${count} stok kaydı var. Kategoriyi silersen stok kayıtları başka bir kategoriye taşınacak. Devam?`))return;let target=db.categories.find(x=>x!==c);db.products.forEach(p=>{if(p.category===c)p.category=target});Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=target});delete db.catalog[c];delete db.categoryIcons[c];db.categories=db.categories.filter(x=>x!==c);save();toast('Kategori silindi')}
 function addCatalogProduct(c){
   if(!db.categories.includes(c))return toast('Kategori bulunamadı');
   let old=document.getElementById('catalogProductModal'); if(old)old.remove();
@@ -390,65 +432,30 @@ function addCatalogProduct(c){
   modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
   modal.innerHTML=`<div style="width:100%;max-width:430px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 15px 40px #0005">
     <div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(c)} kategorisine ürün ekle</div>
-    <div style="font-size:13px;color:#68756e;margin-bottom:12px">Bu ürün tüm şubelerde ortak katalogda görünecek.</div>
+    <div style="font-size:13px;color:#68756e;margin-bottom:12px">Bu ürün daha sonra Ürün Ekle ekranındaki ürün listesinde görünecek.</div>
     <input id="catalogProductName" type="text" placeholder="Ürün adı" autocomplete="off" style="width:100%;padding:13px;border:1px solid #d9e0dc;border-radius:11px;font-size:16px">
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button type="button" class="secondary" id="catalogProductCancel">Vazgeç</button><button type="button" class="primary" id="catalogProductSave">Ürünü ekle</button></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button type="button" class="secondary" id="catalogProductCancel">Vazgeç</button>
+      <button type="button" class="primary" id="catalogProductSave">Ürünü ekle</button>
+    </div>
   </div>`;
   document.body.appendChild(modal);
-  const input=document.getElementById('catalogProductName'); const close=()=>modal.remove(); document.getElementById('catalogProductCancel').onclick=close;
-  document.getElementById('catalogProductSave').onclick=async()=>{
-    let n=(input.value||'').trim(); if(!n)return toast('Ürün adı gerekli');
-    const row=catalogCategoryRows.find(x=>x.name===c); if(!row)return toast('Kategori bulunamadı');
-    if((db.catalog[c]||[]).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');
-    const btn=document.getElementById('catalogProductSave');btn.disabled=true;
-    try{
-      const {data,error}=await supabaseClient.from('products').insert({category_id:row.id,name:n,unit:'Adet',is_active:true}).select('id,name,category_id,barcode,unit,is_active').single();
-      if(error)throw error;
-      catalogProductRows.push(data); db.catalog[c].push(n); localStorage.setItem(KEY,JSON.stringify(db)); close(); render(); $('category').value=c; renderProductTemplate(); $('productTemplate').value=n; toast(`${n} ürünü ${c} kategorisine eklendi`);
-    }catch(err){toast(err?.message||'Ürün eklenemedi.');btn.disabled=false}
+  const input=document.getElementById('catalogProductName');
+  const close=()=>{modal.remove()};
+  document.getElementById('catalogProductCancel').onclick=close;
+  document.getElementById('catalogProductSave').onclick=()=>{
+    let n=(input.value||'').trim();
+    if(!n)return toast('Ürün adı gerekli');
+    if(!db.catalog[c])db.catalog[c]=[];
+    if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');
+    db.catalog[c].push(n); save(); $('category').value=c; renderProductTemplate(); $('productTemplate').value=n; close(); toast(`${n} ürünü ${c} kategorisine eklendi`);
   };
-  modal.addEventListener('click',e=>{if(e.target===modal)close()}); setTimeout(()=>input.focus(),50);
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  setTimeout(()=>input.focus(),50);
 }
-async function renameProduct(c,p){
-  let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;
-  if((db.catalog[c]||[]).some(x=>x!==p&&x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten var');
-  const row=catalogProductRows.find(x=>{const cat=catalogCategoryRows.find(y=>y.id===x.category_id);return cat?.name===c&&x.name===p});
-  if(!row)return toast('Ürün bulunamadı');
-  try{
-    const {error}=await supabaseClient.from('products').update({name:n}).eq('id',row.id);if(error)throw error;
-    const arr=db.catalog[c]||[];arr[arr.indexOf(p)]=n;db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});
-    Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});
-    row.name=n;localStorage.setItem(KEY,JSON.stringify(db));render();toast('Ürün adı değiştirildi');
-  }catch(err){toast(err?.message||'Ürün güncellenemedi.')}
-}
-
-async function moveCatalogProduct(c,p){
-  let targets=db.categories.filter(x=>x!==c);if(!targets.length)return toast('Taşınabilecek başka kategori yok');
-  let list=targets.map((x,i)=>`${i+1}. ${x}`).join('\\n');let answer=prompt(`"${p}" ürününü hangi kategoriye taşımak istiyorsun?\\n\\n${list}\\n\\nKategori numarasını veya adını yaz:`);if(answer===null)return;answer=answer.trim();if(!answer)return;
-  let target=targets.find(x=>x.toLowerCase()===answer.toLowerCase());if(!target&&/^\\d+$/.test(answer)){let i=Number(answer)-1;if(i>=0&&i<targets.length)target=targets[i]}if(!target)return toast('Geçerli bir kategori seçilmedi');
-  if((db.catalog[target]||[]).some(x=>x.toLowerCase()===p.toLowerCase()))return toast(`"${p}" zaten ${target} kategorisinde`);
-  const productRow=catalogProductRows.find(x=>{const cat=catalogCategoryRows.find(y=>y.id===x.category_id);return cat?.name===c&&x.name===p});
-  const targetRow=catalogCategoryRows.find(x=>x.name===target);if(!productRow||!targetRow)return toast('Ürün veya kategori bulunamadı');
-  try{
-    const {error}=await supabaseClient.from('products').update({category_id:targetRow.id}).eq('id',productRow.id);if(error)throw error;
-    db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);db.catalog[target]=(db.catalog[target]||[]);db.catalog[target].push(p);
-    const moved=db.products.filter(x=>x.category===c&&x.name===p);moved.forEach(x=>x.category=target);
-    Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c&&v.name===p)v.category=target});
-    productRow.category_id=targetRow.id;localStorage.setItem(KEY,JSON.stringify(db));render();toast(`${p} ürünü ${target} kategorisine taşındı. ${moved.length} stok kaydı korundu.`);
-  }catch(err){toast(err?.message||'Ürün taşınamadı.')}
-}
-
-async function deleteCatalogProduct(c,p){
-  let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;
-  const row=catalogProductRows.find(x=>{const cat=catalogCategoryRows.find(y=>y.id===x.category_id);return cat?.name===c&&x.name===p});if(!row)return toast('Ürün bulunamadı');
-  if(!confirm(`"${p}" ürününü ortak katalogdan silmek istiyor musun?`))return;
-  try{
-    const {error}=await supabaseClient.from('products').delete().eq('id',row.id);if(error)throw error;
-    db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});
-    catalogProductRows=catalogProductRows.filter(x=>x.id!==row.id);localStorage.setItem(KEY,JSON.stringify(db));render();toast('Ürün ortak katalogdan silindi');
-  }catch(err){toast(err?.message||'Ürün silinemedi. Stok kayıtları bağlıysa Supabase izin vermeyebilir.')}
-}
-
+function renameProduct(c,p){let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;let arr=db.catalog[c]||[];if(arr.includes(n))return toast('Bu ürün zaten var');arr[arr.indexOf(p)]=n;db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});save();toast('Ürün adı değiştirildi')}
+function moveCatalogProduct(c,p){let targets=db.categories.filter(x=>x!==c);if(!targets.length)return toast('Taşınabilecek başka kategori yok');let list=targets.map((x,i)=>`${i+1}. ${x}`).join('\n');let answer=prompt(`\"${p}\" ürününü hangi kategoriye taşımak istiyorsun?\n\n${list}\n\nKategori numarasını veya adını yaz:`);if(answer===null)return;answer=answer.trim();if(!answer)return;let target=targets.find(x=>x.toLowerCase()===answer.toLowerCase());if(!target&&/^\d+$/.test(answer)){let i=Number(answer)-1;if(i>=0&&i<targets.length)target=targets[i]}if(!target)return toast('Geçerli bir kategori seçilmedi');if((db.catalog[target]||[]).some(x=>x.toLowerCase()===p.toLowerCase()))return toast(`\"${p}\" zaten ${target} kategorisinde`);db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);if(!db.catalog[target])db.catalog[target]=[];db.catalog[target].push(p);let moved=db.products.filter(x=>x.category===c&&x.name===p);moved.forEach(x=>x.category=target);Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c&&v.name===p)v.category=target});save();toast(`${p} ürünü ${target} kategorisine taşındı. ${moved.length} stok kaydı korundu.`)}
+function deleteCatalogProduct(c,p){let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan silinsin mi? Mevcut stok kayıtları korunacak.`))return;db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});save();toast('Ürün tanımından silindi')}
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
 let reader=null,controls=null;
 let zxingPromise=null;
