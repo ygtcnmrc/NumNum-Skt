@@ -19,7 +19,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 /* Login */
 #loginScreen{position:fixed;inset:0;background:linear-gradient(145deg,#087b55,#075a3e);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .loginBox{width:100%;max-width:390px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 18px 60px #0004}
-.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}
+.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
@@ -37,7 +37,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
     </form>
   </div>
 </div>
-<header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div class="stats">
+<header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div id="userBar" class="userBar"><span id="currentUserLabel">Oturum açılıyor...</span><button type="button" id="logoutBtn">Çıkış Yap</button></div><div class="stats">
 <button class="stat statBtn" id="statAll"><b id="total">0</b><span>Toplam stok · tümü</span></button><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
 <div class="container"><nav>
 <button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="manage">⚙️<br>Yönetim</button></nav>
@@ -52,22 +52,16 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <label>Barkod / ürün kodu<div style="display:flex;gap:7px;align-items:center"><input id="barcode" inputmode="numeric" placeholder="İsteğe bağlı" style="flex:1"><button type="button" class="secondary" id="scanBarcode">📷 Tara</button></div></label>
 <div id="scannerBox" class="card hidden" style="padding:10px;margin-top:8px"><div class="row"><b>Barkodu kameraya göster</b><button type="button" class="icon" id="closeScanner">✕</button></div><div style="position:relative;margin-top:8px;background:#000;border-radius:14px;overflow:hidden"><video id="barcodeVideo" playsinline muted autoplay style="width:100%;display:block;min-height:260px;object-fit:cover"></video><div style="position:absolute;left:7%;right:7%;top:35%;height:30%;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 9999px #0005"></div></div><div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="secondary" id="torchBtn">🔦 Işık</button><button type="button" class="secondary" id="manualBtn">⌨️ Elle gir</button></div><div class="muted" style="margin-top:8px">Telefonu barkoda paralel tut. Yansıma varsa açıyı değiştir.</div></div>
 <label>Not / Raf<input id="note" placeholder="Örn. Bar depo / Raf 2"></label><div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="save">Kaydet</button><button class="secondary hidden" id="cancelEdit">Vazgeç</button></div></div></section>
-<section id="manage" class="page hidden"><div class="card"><b>Kategori & Ürün Yönetimi</b><p class="muted">Buradan kategori ve o kategoride görünecek ürünleri oluşturabilir, düzenleyebilir veya silebilirsin.</p><button class="primary" id="addCat">➕ Yeni kategori</button><div id="manageCats" style="margin-top:12px"></div></div>
-<div class="card" id="userManagementCard"><b>👥 Kullanıcı Yönetimi</b><p class="muted">Yeni kullanıcı oluştur. Kullanıcı yalnızca seçtiğin şubeye erişebilir.</p>
+<section id="manage" class="page hidden"><div class="card" id="catalogManagementCard"><b>Kategori & Ürün Yönetimi</b><p class="muted">Buradan kategori ve o kategoride görünecek ürünleri oluşturabilir, düzenleyebilir veya silebilirsin.</p><button class="primary" id="addCat">➕ Yeni kategori</button><div id="manageCats" style="margin-top:12px"></div></div>
+<div class="card hidden" id="userManagementCard"><b>👥 Kullanıcı Yönetimi</b><p class="muted">Yeni kullanıcı oluştur. Kullanıcı yalnızca seçtiğin şubeye erişebilir.</p>
 <form id="createUserForm" autocomplete="off">
 <label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
 <label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
 <label>Şifre<input id="newUserPassword" type="password" placeholder="En az 6 karakter" autocomplete="new-password" minlength="6" required></label>
-<label>Rol<select id="newUserRole" required>
-<option value="kullanıcı">👤 Kullanıcı</option>
-<option value="yönetici">🧑‍💼 Yönetici</option>
-<option value="admin">👑 Admin</option>
-</select></label>
-<label>Şube<select id="newUserBranch"><option value="">Şube seç...</option></select></label>
-<div id="adminBranchNote" class="muted" style="margin-top:7px;display:none">Admin ve Yönetici için şube seçilmez; bu roller tüm şubeleri görebilir.</div>
+<label>Şube<select id="newUserBranch" required><option value="">Şube yükleniyor...</option></select></label>
 <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
 </form></div>
-<div class="card"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
+<div class="card" id="adminDataCard"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
 
 <script>
@@ -89,8 +83,27 @@ function showLoginError(msg){
   if(el){el.textContent=msg;el.classList.remove('hidden')}
 }
 function hideLoginError(){document.getElementById('loginError')?.classList.add('hidden')}
-function showApp(){document.getElementById('loginScreen')?.classList.add('hidden');document.body.classList.remove('authLocked')}
+function showApp(){
+  document.getElementById('loginScreen')?.classList.add('hidden');
+  document.body.classList.remove('authLocked');
+  const role=String(currentProfile?.role||'').trim().toLowerCase();
+  const name=currentProfile?.full_name||'Kullanıcı';
+  const label=document.getElementById('currentUserLabel');
+  if(label) label.textContent=`${name} · ${role==='admin'?'Admin':role==='yönetici'?'Yönetici':'Kullanıcı'}`;
+  const manageNav=document.querySelector('nav button[data-page="manage"]');
+  if(manageNav) manageNav.classList.toggle('hidden',role!=='admin');
+}
 function showLogin(){document.getElementById('loginScreen')?.classList.remove('hidden')}
+async function logout(){
+  await supabaseClient.auth.signOut();
+  currentProfile=null;
+  sessionStorage.removeItem(APP_AUTH_KEY);
+  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!=='home'));
+  document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page==='home'));
+  showLogin();
+  $('loginPassword').value='';
+  hideLoginError();
+}
 
 async function loginWithUsername(username,password){
   username=String(username||'').trim();
@@ -104,7 +117,6 @@ async function loginWithUsername(username,password){
   const {data:profile,error:profileError}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',data.user.id).single();
   if(profileError){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Hesabınız aktif değil.');}
   currentProfile=profile;
-  renderManage();
   sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));
   return profile;
 }
@@ -120,7 +132,7 @@ async function initAuth(){
   const {data:{session}}=await supabaseClient.auth.getSession();
   if(session?.user){
     const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
-    if(!error&&profile?.is_active){currentProfile=profile;renderManage();sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();render();return;}
+    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();render();return;}
     await supabaseClient.auth.signOut();
   }
   showLogin();
@@ -168,8 +180,21 @@ function level(p){let d=days(p);if(d<0)return ['danger','GEÇMİŞ'];if(d===0)re
 function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
-function show(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));if(page==='products')renderProducts();if(page==='manage')renderManage();if(page==='add')renderProductTemplate();window.scrollTo({top:0,behavior:'smooth'})}
+function show(page){
+  const role=String(currentProfile?.role||'').trim().toLowerCase();
+  if(page==='manage' && role!=='admin'){
+    toast('Bu bölüm yalnızca Admin yetkisine açıktır.');
+    return;
+  }
+  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));
+  document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  if(page==='products')renderProducts();
+  if(page==='manage')renderManage();
+  if(page==='add')renderProductTemplate();
+  window.scrollTo({top:0,behavior:'smooth'})
+}
 document.querySelectorAll('nav button[data-page]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.page)));
+document.getElementById('logoutBtn')?.addEventListener('click',logout);
 function fillCats(){let o=db.categories.map(c=>`<option>${esc(c)}</option>`).join('');$('category').innerHTML=o;$('filter').innerHTML='<option value="">Tüm kategoriler</option>'+o}
 function renderStats(){let ps=db.products;$('total').textContent=ps.length;$('d30').textContent=ps.filter(p=>days(p)>=0&&days(p)<=30).length;$('d15').textContent=ps.filter(p=>days(p)>=0&&days(p)<=15).length;$('d5').textContent=ps.filter(p=>days(p)>=0&&days(p)<=5).length}
 function renderAlerts(){let ps=db.products.filter(p=>{let d=days(p);return d>=0&&d<=30}).sort((a,b)=>days(a)-days(b));let ex=db.products.filter(p=>days(p)<0).sort((a,b)=>days(a)-days(b));let out='';if(ex.length)out+=`<div class="sectionTitle">⛔ Süresi geçen</div>`+ex.slice(0,15).map(alertCard).join('');if(ps.length)out+=`<div class="sectionTitle">SKT yaklaşan ürünler</div>`+ps.slice(0,30).map(alertCard).join('');$('alerts').innerHTML=out||'<div class="empty">🎉 Yaklaşan SKT yok.</div>'}
@@ -180,10 +205,15 @@ function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]
 function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
 function jsarg(v){return JSON.stringify(v).replace(/'/g,'&#39;')}
 function renderManage(){
-  $('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon" onclick='renameCat(${jsarg(c)})'>✏️</button><button class="icon dangerBtn" onclick='deleteCat(${jsarg(c)})'>🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick='renameProduct(${jsarg(c)},${jsarg(p)})'>✏️</button><button class="icon" title="Başka kategoriye taşı" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)})'>↗️</button><button class="icon dangerBtn" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)})'>🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button></div>`}).join('');
+  const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+  $('catalogManagementCard')?.classList.toggle('hidden',!isAdmin);
+  $('adminDataCard')?.classList.toggle('hidden',!isAdmin);
+  $('manageCats').innerHTML=isAdmin ? db.categories.map(c=>{
+    let arr=db.catalog[c]||[];
+    return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon" onclick='renameCat(${jsarg(c)})'>✏️</button><button class="icon dangerBtn" onclick='deleteCat(${jsarg(c)})'>🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick='renameProduct(${jsarg(c)},${jsarg(p)})'>✏️</button><button class="icon" title="Başka kategoriye taşı" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)})'>↗️</button><button class="icon dangerBtn" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)})'>🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button></div>`;
+  }).join('') : '';
   const card=$('userManagementCard');
   if(!card)return;
-  const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
   card.classList.toggle('hidden',!isAdmin);
   if(isAdmin) loadBranchesForUserForm();
 }
@@ -193,7 +223,6 @@ async function loadBranchesForUserForm(){
   if(!sel || currentProfile?.role!=='admin')return;
   if(branchesCache.length){
     sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
-    updateUserRoleForm();
     return;
   }
   sel.innerHTML='<option value="">Şubeler yükleniyor...</option>';
@@ -205,56 +234,19 @@ async function loadBranchesForUserForm(){
   }
   branchesCache=data||[];
   sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
-  updateUserRoleForm();
-}
-
-function updateUserRoleForm(){
-  const role=$('newUserRole')?.value||'kullanıcı';
-  const branch=$('newUserBranch');
-  const note=$('adminBranchNote');
-  const btn=$('createUserBtn');
-  const allBranches=role==='admin'||role==='yönetici';
-
-  if(branch){
-    branch.required=!allBranches;
-    branch.disabled=allBranches;
-    if(allBranches) branch.value='';
-  }
-
-  if(note){
-    note.style.display=allBranches?'block':'none';
-    note.textContent=role==='admin'
-      ? 'Admin için şube seçilmez; Admin tüm şubeleri yönetebilir.'
-      : 'Yönetici için şube seçilmez; Yönetici tüm şubeleri görebilir.';
-  }
-
-  if(btn){
-    btn.textContent=role==='admin'
-      ? '👑 Admin oluştur'
-      : role==='yönetici'
-        ? '🧑‍💼 Yönetici oluştur'
-        : '👤 Kullanıcı oluştur';
-  }
 }
 
 async function createUserFromAdmin(e){
   e.preventDefault();
   if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
-
   const fullName=$('newUserFullName').value.trim();
   const username=$('newUserUsername').value.trim().toLowerCase();
   const password=$('newUserPassword').value;
-  const role=$('newUserRole').value;
   const branchId=$('newUserBranch').value;
-
-  if(!fullName||!username||!password)return toast('Ad soyad, kullanıcı adı ve şifre zorunludur.');
+  if(!fullName||!username||!password||!branchId)return toast('Ad soyad, kullanıcı adı, şifre ve şube zorunludur.');
   if(password.length<6)return toast('Şifre en az 6 karakter olmalıdır.');
-  if(!['admin','yönetici','kullanıcı'].includes(role))return toast('Geçersiz rol.');
-  if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
-
   const btn=$('createUserBtn'),msg=$('userCreateMsg');
   btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
-
   try{
     const {data:{session}}=await supabaseClient.auth.getSession();
     if(!session?.access_token)throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
@@ -266,32 +258,20 @@ async function createUserFromAdmin(e){
         'apikey':SUPABASE_PUBLISHABLE_KEY,
         'Content-Type':'application/json'
       },
-      body:JSON.stringify({
-        full_name:fullName,
-        username,
-        password,
-        role,
-        branch_id:role==='kullanıcı'?branchId:null
-      })
+      body:JSON.stringify({full_name:fullName,username,password,branch_id:branchId})
     });
 
     let result=null;
     try{result=await response.json()}catch(_){}
     if(!response.ok){
       const detail=result?.error||result?.message||`Sunucu hatası (${response.status})`;
-      const extra=result?.detail?` — ${result.detail}`:'';
-      throw new Error(detail+extra);
+      throw new Error(detail);
     }
     if(!result?.success)throw new Error(result?.error||'Kullanıcı oluşturulamadı.');
-
     $('createUserForm').reset();
     $('newUserBranch').value='';
-    $('newUserRole').value='kullanıcı';
-    updateUserRoleForm();
-
     msg.textContent='Kullanıcı oluşturuldu ✓';
-    const roleText=role==='admin'?'Admin':role==='yönetici'?'Yönetici':'Kullanıcı';
-    toast(`${fullName} · ${roleText} oluşturuldu.`);
+    toast(`${fullName} kullanıcısı oluşturuldu.`);
   }catch(err){
     msg.textContent='';
     toast(err?.message||'Kullanıcı oluşturulamadı.');
@@ -313,7 +293,6 @@ $('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange
 $('save').onclick=()=>{let cat=$('category').value,name=$('productTemplate').value,exp=$('expiry').value;if(!cat||!name||!exp)return toast('Kategori, ürün ve SKT gerekli');let code=$('barcode').value.trim();let data={name,category:cat,expiry:exp,qty:Number($('qty').value)||0,unit:$('unit').value,barcode:code,note:$('note').value.trim()};if(code){db.barcodeMap[code]={category:cat,name:name}}if(db.editId){let p=db.products.find(x=>x.id===db.editId);if(p)Object.assign(p,data);toast(code?'Stok kaydı güncellendi · barkod ürüne tanımlandı':'Stok kaydı güncellendi')}else{db.products.push({...data,id:crypto.randomUUID()});toast(code?'Stok kaydı eklendi · barkod ürüne tanımlandı':'Stok kaydı eklendi')}save();resetForm();show('products')}
 $('cancelEdit').onclick=()=>{resetForm();show('products')};
 $('newCategoryInline').onclick=()=>{addCat()};$('newProductInline').onclick=()=>{let c=$('category').value;if(c)addCatalogProduct(c);else toast('Önce kategori seç')};$('addCat').onclick=addCat;
-$('newUserRole')?.addEventListener('change',updateUserRoleForm);
 $('createUserForm')?.addEventListener('submit',createUserFromAdmin);
 function openCategoryModal(mode,c){
   let old=document.getElementById('categoryModal'); if(old)old.remove();
