@@ -53,7 +53,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <div id="scannerBox" class="card hidden" style="padding:10px;margin-top:8px"><div class="row"><b>Barkodu kameraya göster</b><button type="button" class="icon" id="closeScanner">✕</button></div><div style="position:relative;margin-top:8px;background:#000;border-radius:14px;overflow:hidden"><video id="barcodeVideo" playsinline muted autoplay style="width:100%;display:block;min-height:260px;object-fit:cover"></video><div style="position:absolute;left:7%;right:7%;top:35%;height:30%;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 9999px #0005"></div></div><div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="secondary" id="torchBtn">🔦 Işık</button><button type="button" class="secondary" id="manualBtn">⌨️ Elle gir</button></div><div class="muted" style="margin-top:8px">Telefonu barkoda paralel tut. Yansıma varsa açıyı değiştir.</div></div>
 <label>Not / Raf<input id="note" placeholder="Örn. Bar depo / Raf 2"></label><div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="save">Kaydet</button><button class="secondary hidden" id="cancelEdit">Vazgeç</button></div></div></section>
 <section id="manage" class="page hidden"><div class="card"><b>Kategori & Ürün Yönetimi</b><p class="muted">Buradan kategori ve o kategoride görünecek ürünleri oluşturabilir, düzenleyebilir veya silebilirsin.</p><button class="primary" id="addCat">➕ Yeni kategori</button><div id="manageCats" style="margin-top:12px"></div></div>
-<div class="card hidden" id="userManagementCard"><b>👥 Kullanıcı Yönetimi</b><p class="muted">Yeni kullanıcı oluştur. Kullanıcı yalnızca seçtiğin şubeye erişebilir.</p>
+<div class="card" id="userManagementCard"><b>👥 Kullanıcı Yönetimi</b><p class="muted">Yeni kullanıcı oluştur. Kullanıcı yalnızca seçtiğin şubeye erişebilir.</p>
 <form id="createUserForm" autocomplete="off">
 <label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
 <label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
@@ -104,6 +104,7 @@ async function loginWithUsername(username,password){
   const {data:profile,error:profileError}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',data.user.id).single();
   if(profileError){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Hesabınız aktif değil.');}
   currentProfile=profile;
+  renderManage();
   sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));
   return profile;
 }
@@ -119,7 +120,7 @@ async function initAuth(){
   const {data:{session}}=await supabaseClient.auth.getSession();
   if(session?.user){
     const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
-    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();render();return;}
+    if(!error&&profile?.is_active){currentProfile=profile;renderManage();sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();render();return;}
     await supabaseClient.auth.signOut();
   }
   showLogin();
@@ -182,7 +183,7 @@ function renderManage(){
   $('manageCats').innerHTML=db.categories.map(c=>{let arr=db.catalog[c]||[];return `<div class="card" style="box-shadow:none;border:1px solid #e8eeea"><div class="row"><b>${catIcon(c)} ${esc(c)}</b><div class="actions"><button class="icon" onclick='renameCat(${jsarg(c)})'>✏️</button><button class="icon dangerBtn" onclick='deleteCat(${jsarg(c)})'>🗑️</button></div></div><div style="margin-top:8px">${arr.length?arr.map(p=>`<div class="row" style="padding:7px 0;border-top:1px solid #f0f2f1"><span class="small">${esc(p)}</span><span class="actions"><button class="icon" onclick='renameProduct(${jsarg(c)},${jsarg(p)})'>✏️</button><button class="icon" title="Başka kategoriye taşı" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)})'>↗️</button><button class="icon dangerBtn" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)})'>🗑️</button></span></div>`).join(''):'<div class="muted">Henüz ürün tanımlı değil.</div>'}</div><button class="secondary" style="margin-top:9px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button></div>`}).join('');
   const card=$('userManagementCard');
   if(!card)return;
-  const isAdmin=currentProfile?.role==='admin';
+  const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
   card.classList.toggle('hidden',!isAdmin);
   if(isAdmin) loadBranchesForUserForm();
 }
