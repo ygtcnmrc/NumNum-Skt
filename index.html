@@ -15,8 +15,28 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 .search{position:relative}.search input{padding-left:38px}.search span{position:absolute;left:13px;top:15px}.item h3{margin:0;font-size:16px}.item p{margin:5px 0}.empty{text-align:center;color:var(--muted);padding:35px 10px}.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:9px}.toolbar>*{flex:1}.hidden{display:none!important}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#17221d;color:#fff;padding:12px 16px;border-radius:12px;z-index:30;font-size:13px;max-width:90%;box-shadow:0 5px 20px #0004}
 .sectionTitle{font-size:14px;font-weight:800;margin:18px 0 8px}.catChip{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;margin:7px 0}.small{font-size:11px}.actions{display:flex;gap:6px;flex-wrap:wrap}.productSelectNote{background:#eef8f4;border-radius:10px;padding:9px;font-size:11px;color:#356253;margin-top:8px}.iconGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px}.emojiBtn{border:1px solid #e1e7e3;background:#f7faf8;border-radius:12px;padding:10px 4px;font-size:24px;cursor:pointer}.emojiBtn.selected{border:2px solid var(--g);background:#e5f4ee}.catIconPreview{font-size:30px;line-height:1}
 @media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.toolbar{display:grid;grid-template-columns:1fr}.toolbar>*{width:100%}}
-</style></head>
+
+/* Login */
+#loginScreen{position:fixed;inset:0;background:linear-gradient(145deg,#087b55,#075a3e);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.loginBox{width:100%;max-width:390px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 18px 60px #0004}
+.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
+<div id="loginScreen">
+  <div class="loginBox">
+    <div class="loginLogo">🍸</div>
+    <div class="loginTitle">NumNum SKT</div>
+    <div class="loginSub">Bar ürünleri & SKT takip</div>
+    <form id="loginForm" autocomplete="on">
+      <label>Kullanıcı adı<input id="loginUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Kullanıcı adınız" required></label>
+      <label>Şifre<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifreniz" required></label>
+      <button class="primary loginBtn" type="submit" id="loginBtn">Giriş Yap</button>
+      <div id="loginError" class="loginError hidden"></div>
+      <div id="loginLoading" class="loginLoading hidden">Giriş yapılıyor...</div>
+    </form>
+  </div>
+</div>
 <header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div class="stats">
 <button class="stat statBtn" id="statAll"><b id="total">0</b><span>Toplam stok · tümü</span></button><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
 <div class="container"><nav>
@@ -36,6 +56,57 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <footer></footer></div><div id="toast" class="toast hidden"></div>
 
 <script>
+
+const SUPABASE_URL='https://kjigojputuojurfclwng.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_9Z6eSKH4riiIIhk6nvKAwA_Qcq6V2kO';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const APP_AUTH_KEY='barskt_auth_v1';
+
+function setLoginBusy(busy){
+  const btn=document.getElementById('loginBtn'), loading=document.getElementById('loginLoading');
+  if(btn){btn.disabled=busy;btn.style.opacity=busy?.7:1;btn.textContent=busy?'Giriş yapılıyor...':'Giriş Yap'}
+  loading?.classList.toggle('hidden',!busy);
+}
+function showLoginError(msg){
+  const el=document.getElementById('loginError');
+  if(el){el.textContent=msg;el.classList.remove('hidden')}
+}
+function hideLoginError(){document.getElementById('loginError')?.classList.add('hidden')}
+function showApp(){document.getElementById('loginScreen')?.classList.add('hidden');document.body.classList.remove('authLocked')}
+function showLogin(){document.getElementById('loginScreen')?.classList.remove('hidden')}
+
+async function loginWithUsername(username,password){
+  username=String(username||'').trim();
+  if(!username||!password) throw new Error('Kullanıcı adı ve şifre gerekli.');
+  const {data:emailData,error:emailError}=await supabaseClient.rpc('get_login_email',{p_username:username});
+  if(emailError) throw new Error('Giriş servisine bağlanılamadı.');
+  const email=typeof emailData==='string'?emailData:(Array.isArray(emailData)?emailData[0]?.auth_email:null);
+  if(!email) throw new Error('Kullanıcı adı veya şifre hatalı.');
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error||!data?.user) throw new Error('Kullanıcı adı veya şifre hatalı.');
+  const {data:profile,error:profileError}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',data.user.id).single();
+  if(profileError||!profile||!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Kullanıcı profili aktif değil.');}
+  sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));
+  return profile;
+}
+
+async function initAuth(){
+  const form=document.getElementById('loginForm');
+  form?.addEventListener('submit',async e=>{
+    e.preventDefault();hideLoginError();setLoginBusy(true);
+    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);showApp();render();toast('Hoş geldin 👋');}
+    catch(err){showLoginError(err?.message||'Giriş yapılamadı.');}
+    finally{setLoginBusy(false)}
+  });
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(session?.user){
+    const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
+    if(!error&&profile?.is_active){sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));showApp();return;}
+    await supabaseClient.auth.signOut();
+  }
+  showLogin();
+}
+
 const KEY='barskt_v5';
 const seed={
 'Bira':['Tuborg Frederik Märzen Lager','Tuborg Frederik India Pale Ale','Tuborg Frederik Wheat IPA','Tuborg Frederik Yakima IPA','Tuborg Gold','Tuborg Fıçı','Tuborg Ice','Carlsberg','Carlsberg Luna','Heineken','Guinness','Sol','Budweiser','Desperados','1664 Blanc','Weihenstephan Hefeweissbier','Weihenstephan Vitus'],
@@ -216,6 +287,6 @@ async function lookup(code){code=String(code||'').trim();if(!code)return;
   }catch(e){$('barcode').value=code;toast('Barkod okundu; internetten ürün bilgisi alınamadı. Seçtiğin ürünü kaydettiğinde barkod hafızaya alınacak.')}}
 function findCat(p){let c=((p.categories_tags||[]).join(' ')+' '+(p.categories||'')).toLowerCase();if(/beer|bira/.test(c))return'Bira';if(/wine|şarap/.test(c))return'Şarap';if(/vodka/.test(c))return'Vodka';if(/gin/.test(c))return'Gin';if(/whisky|whiskey/.test(c))return'Whisky';if(/rum/.test(c))return'Rum';if(/tequila/.test(c))return'Tequila';if(/liqueur|likör/.test(c))return'Likör';if(/soft-drink|soda|cola|lemonade|meşrubat/.test(c))return'Soft İçecekler';return null}
 $('scanBarcode').onclick=startScanner;$('closeScanner').onclick=stopScanner;$('manualBtn').onclick=()=>{stopScanner();$('barcode').focus()};$('torchBtn').onclick=async()=>{let t=$('barcodeVideo').srcObject?.getVideoTracks?.()[0];try{let c=t?.getCapabilities?.();if(c?.torch)await t.applyConstraints({advanced:[{torch:!(t.getSettings().torch===true)}]});else toast('Bu kamerada ışık kontrolü yok')}catch(e){toast('Işık açılamadı')}};
-render();
+initAuth();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script></body></html>
