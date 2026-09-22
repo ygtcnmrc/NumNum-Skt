@@ -329,18 +329,56 @@ async function createUserFromAdmin(e){
 async function editUser(id){
   const {data:u,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id').eq('id',id).single();
   if(error||!u)return toast('Kullanıcı bulunamadı.');
-  const full=prompt('Ad Soyad:',u.full_name);if(full===null)return;
-  const username=prompt('Kullanıcı adı:',u.username||'');if(username===null)return;
-  const roleInput=prompt('Rol yaz: admin / yönetici / kullanıcı',u.role);if(roleInput===null)return;
-  const role=roleInput.trim().toLowerCase();if(!['admin','yönetici','kullanıcı'].includes(role))return toast('Geçersiz rol.');
-  let branchId=null;
-  if(role==='kullanıcı'){
-    const names=branchesCache.filter(b=>b.is_active).map(b=>b.name).join(', ');
-    const branchNameInput=prompt(`Kullanıcı için şube adı (${names}):`,branchesCache.find(b=>b.id===u.branch_id)?.name||'');if(branchNameInput===null)return;
-    const br=branchesCache.find(b=>b.is_active&&b.name.toLowerCase()===branchNameInput.trim().toLowerCase());if(!br)return toast('Geçerli bir şube adı gir.');branchId=br.id;
-  }
-  if(!full.trim()||!username.trim())return toast('Ad soyad ve kullanıcı adı boş olamaz.');
-  try{await adminAction({action:'update',user_id:id,full_name:full.trim(),username:username.trim().toLowerCase(),role,branch_id:branchId});toast('Kullanıcı bilgileri güncellendi.');await loadUsers();}catch(err){toast(err?.message||'Kullanıcı güncellenemedi.')}
+
+  const activeBranches=branchesCache.filter(b=>b.is_active);
+  const modal=document.createElement('div');
+  modal.id='editUserModal';
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+  const branchOptions=activeBranches.map(b=>`<option value="${esc(b.id)}" ${b.id===u.branch_id?'selected':''}>${esc(b.name)}</option>`).join('');
+  const roleOptions=`<option value="kullanıcı" ${u.role==='kullanıcı'?'selected':''}>👤 Kullanıcı</option><option value="yönetici" ${u.role==='yönetici'?'selected':''}>🧑‍💼 Yönetici</option><option value="admin" ${u.role==='admin'?'selected':''}>👑 Admin</option>`;
+  modal.innerHTML=`<div style="width:100%;max-width:460px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 15px 40px #0005;max-height:90vh;overflow:auto">
+    <div class="row" style="margin-bottom:16px"><h3 style="margin:0">✏️ Kullanıcı Düzenle</h3><button type="button" class="icon" id="editUserClose">✕</button></div>
+    <label>Ad Soyad<input id="editUserFullName" value="${esc(u.full_name||'')}" placeholder="Örn. Ahmet Yılmaz"></label>
+    <label>Kullanıcı adı<input id="editUserUsername" value="${esc(u.username||'')}" placeholder="Örn. ahmet" autocapitalize="none" autocomplete="off"></label>
+    <label>Rol<select id="editUserRole">${roleOptions}</select></label>
+    <label>Şube<select id="editUserBranch"><option value="">Şube seç...</option>${branchOptions}</select></label>
+    <div id="editUserRoleNote" class="productSelectNote"></div>
+    <div class="actions" style="justify-content:flex-end;margin-top:16px"><button type="button" class="secondary" id="editUserCancel">Vazgeç</button><button type="button" id="editUserSave">💾 Kaydet</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  const roleSel=modal.querySelector('#editUserRole');
+  const branchSel=modal.querySelector('#editUserBranch');
+  const note=modal.querySelector('#editUserRoleNote');
+  const syncRole=()=>{
+    const role=roleSel.value;
+    const isUser=role==='kullanıcı';
+    branchSel.disabled=!isUser;
+    if(!isUser){branchSel.value='';note.textContent='Bu roldeki kullanıcı tüm şubelere erişebilir.';}
+    else {note.textContent='Kullanıcı yalnızca seçilen şubeye erişir.';}
+  };
+  roleSel.addEventListener('change',syncRole);
+  syncRole();
+
+  const close=()=>modal.remove();
+  modal.querySelector('#editUserClose').onclick=close;
+  modal.querySelector('#editUserCancel').onclick=close;
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+
+  modal.querySelector('#editUserSave').onclick=async()=>{
+    const full=modal.querySelector('#editUserFullName').value.trim();
+    const username=modal.querySelector('#editUserUsername').value.trim().toLowerCase();
+    const role=roleSel.value;
+    const branchId=role==='kullanıcı'?branchSel.value:null;
+    if(!full||!username)return toast('Ad soyad ve kullanıcı adı boş olamaz.');
+    if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+    const saveBtn=modal.querySelector('#editUserSave');
+    saveBtn.disabled=true;saveBtn.style.opacity='.7';
+    try{
+      await adminAction({action:'update',user_id:id,full_name:full,username,role,branch_id:branchId});
+      close();toast('Kullanıcı bilgileri güncellendi.');await loadUsers();
+    }catch(err){toast(err?.message||'Kullanıcı güncellenemedi.');saveBtn.disabled=false;saveBtn.style.opacity='1'}
+  };
 }
 
 async function resetUserPassword(id){
