@@ -63,6 +63,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <div id="newUserRoleNote" class="productSelectNote">Kullanıcı seçildiğinde yalnızca seçilen şubeye erişir.</div>
 <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
 </form></div>
+<div class="card hidden" id="branchManagementCard"><div class="row"><div><b>🏢 Şube Yönetimi</b><div class="muted" style="margin-top:4px">Şube ekle, adını değiştir veya aktif/pasif durumunu yönet.</div></div><button class="secondary" id="refreshBranches">↻ Yenile</button></div><div style="display:flex;gap:8px;margin-top:12px"><input id="newBranchName" type="text" placeholder="Yeni şube adı" autocomplete="off" style="margin-top:0;flex:1"><button class="primary" id="addBranchBtn">➕ Ekle</button></div><div id="branchesAdminList" style="margin-top:12px"></div></div>
 <div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
 <div class="card" id="adminDataCard"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
 <footer></footer></div><div id="toast" class="toast hidden"></div>
@@ -110,25 +111,26 @@ async function loadBranchSwitcher(){
     if(error){bar.classList.add('hidden');toast('Şubeler yüklenemedi.');return;}
     branchesCache=data||[];
   }
+  const activeBranches=branchesCache.filter(b=>b.is_active);
   let activeId=currentProfile.branch_id||selectedBranchId;
   if(role==='kullanıcı'){
-    const own=branchesCache.find(b=>b.id===currentProfile.branch_id);
+    const own=activeBranches.find(b=>b.id===currentProfile.branch_id);
     if(own) activeId=own.id;
     selectedBranchId=activeId;
     sessionStorage.setItem('barskt_selected_branch',activeId||'');
     sel.innerHTML=own?`<option value="${own.id}">${esc(own.name)}</option>`:'<option>Şube tanımsız</option>';
     sel.disabled=true;
   }else{
-    if(!activeId || !branchesCache.some(b=>b.id===activeId)) activeId=branchesCache[0]?.id||null;
+    if(!activeId || !activeBranches.some(b=>b.id===activeId)) activeId=activeBranches[0]?.id||null;
     selectedBranchId=activeId;
     if(activeId)sessionStorage.setItem('barskt_selected_branch',activeId);
-    sel.innerHTML=branchesCache.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    sel.innerHTML=activeBranches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
     sel.value=activeId||'';
     sel.disabled=false;
     sel.onchange=()=>{
       selectedBranchId=sel.value||null;
       if(selectedBranchId)sessionStorage.setItem('barskt_selected_branch',selectedBranchId);else sessionStorage.removeItem('barskt_selected_branch');
-      const branch=branchesCache.find(b=>b.id===selectedBranchId);
+      const branch=activeBranches.find(b=>b.id===selectedBranchId);
       toast(branch?`${branch.name} şubesi seçildi.`:'Şube seçilmedi.');
     };
   }
@@ -257,11 +259,85 @@ function renderManage(){
   }).join('') : '';
   const card=$('userManagementCard');
   const usersCard=$('usersListCard');
+  const branchCard=$('branchManagementCard');
   if(!card)return;
   card.classList.toggle('hidden',!isAdmin);
   usersCard?.classList.toggle('hidden',!isAdmin);
-  if(isAdmin){ loadBranchesForUserForm(); loadUsers(); updateUserRoleForm(); }
+  branchCard?.classList.toggle('hidden',!isAdmin);
+  if(isAdmin){ loadBranchesForUserForm(); loadUsers(); loadBranchManagement(); updateUserRoleForm(); }
 }
+
+async function loadBranchManagement(){
+  if(currentProfile?.role!=='admin')return;
+  const list=$('branchesAdminList');
+  if(!list)return;
+  list.innerHTML='<div class="empty">Şubeler yükleniyor...</div>';
+  const {data,error}=await supabaseClient.from('branches').select('id,name,is_active,created_at').order('name');
+  if(error){list.innerHTML='<div class="empty">Şubeler okunamadı.</div>';toast('Şubeler yüklenemedi.');return;}
+  branchesCache=data||[];
+  list.innerHTML=branchesCache.map(b=>`<div class="userRow"><div class="row"><div><b>🏢 ${esc(b.name)}</b><div class="meta">Durum: ${b.is_active?'Aktif':'Pasif'}</div></div><span class="roleBadge" style="background:${b.is_active?'#dcfce7':'#fee2e2'};color:${b.is_active?'#15803d':'#b91c1c'}">${b.is_active?'🟢 Aktif':'🔴 Pasif'}</span></div><div class="userActions"><button class="secondary" onclick='renameBranch(${jsarg(b.id)},${jsarg(b.name)})'>✏️ Düzenle</button><button class="secondary" onclick='toggleBranch(${jsarg(b.id)},${jsarg(b.name)},${b.is_active})'>${b.is_active?'🔴 Pasif yap':'🟢 Aktif yap'}</button><button class="secondary dangerBtn" onclick='deleteBranch(${jsarg(b.id)},${jsarg(b.name)})'>🗑️ Sil</button></div></div>`).join('')||'<div class="empty">Henüz şube yok.</div>';
+  loadBranchSwitcher();
+  loadBranchesForUserForm();
+}
+
+async function addBranch(){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  const input=$('newBranchName');
+  const name=(input?.value||'').trim();
+  if(!name)return toast('Şube adı gerekli.');
+  const duplicate=branchesCache.some(b=>b.name.trim().toLocaleLowerCase('tr-TR')===name.toLocaleLowerCase('tr-TR'));
+  if(duplicate)return toast('Bu şube zaten mevcut.');
+  const {data,error}=await supabaseClient.from('branches').insert({name,is_active:true}).select('id,name,is_active,created_at').single();
+  if(error){toast(error.message||'Şube oluşturulamadı.');return;}
+  if(input)input.value='';
+  toast(`${data.name} şubesi oluşturuldu.`);
+  await loadBranchManagement();
+}
+
+async function renameBranch(id,oldName){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  const name=prompt('Yeni şube adı:',oldName);
+  if(name===null)return;
+  const clean=name.trim();
+  if(!clean)return toast('Şube adı boş olamaz.');
+  const duplicate=branchesCache.some(b=>b.id!==id&&b.name.trim().toLocaleLowerCase('tr-TR')===clean.toLocaleLowerCase('tr-TR'));
+  if(duplicate)return toast('Bu şube adı zaten mevcut.');
+  const {error}=await supabaseClient.from('branches').update({name:clean}).eq('id',id);
+  if(error){toast(error.message||'Şube güncellenemedi.');return;}
+  if(selectedBranchId===id)sessionStorage.setItem('barskt_selected_branch',id);
+  toast('Şube adı güncellendi.');
+  await loadBranchManagement();
+  await loadUsers();
+}
+
+async function toggleBranch(id,name,isActive){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  if(isActive){
+    const assigned=await supabaseClient.from('profiles').select('id',{count:'exact',head:true}).eq('branch_id',id).eq('is_active',true);
+    if(assigned.error){toast('Kullanıcı kontrolü yapılamadı.');return;}
+    if((assigned.count||0)>0){
+      if(!confirm(`${name} şubesinde ${(assigned.count||0)} aktif kullanıcı var. Şubeyi pasif yaparsan bu kullanıcılar girişte erişim sorunu yaşayabilir. Devam edilsin mi?`))return;
+    }
+  }
+  const {error}=await supabaseClient.from('branches').update({is_active:!isActive}).eq('id',id);
+  if(error){toast(error.message||'Şube durumu değiştirilemedi.');return;}
+  toast(`${name} ${!isActive?'aktif':'pasif'} yapıldı.`);
+  await loadBranchManagement();
+}
+
+async function deleteBranch(id,name){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  if(!confirm(`${name} şubesi silinsin mi? Şubeye bağlı kullanıcı/stok kayıtları varsa silme işlemi gerçekleşmez.`))return;
+  const {error}=await supabaseClient.from('branches').delete().eq('id',id);
+  if(error){toast('Şube silinemedi. Bağlı kullanıcı veya stok kayıtları olabilir.');return;}
+  if(selectedBranchId===id){selectedBranchId=null;sessionStorage.removeItem('barskt_selected_branch');}
+  toast(`${name} silindi.`);
+  await loadBranchManagement();
+}
+
+$('addBranchBtn')?.addEventListener('click',addBranch);
+$('refreshBranches')?.addEventListener('click',loadBranchManagement);
+$('newBranchName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addBranch()});
 
 function roleLabel(role){return role==='admin'?'👑 Admin':role==='yönetici'?'🧑‍💼 Yönetici':'👤 Kullanıcı'}
 function updateUserRoleForm(){
