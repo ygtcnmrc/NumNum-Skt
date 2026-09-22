@@ -58,15 +58,13 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
 <label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
 <label>Şifre<input id="newUserPassword" type="password" placeholder="En az 6 karakter" autocomplete="new-password" minlength="6" required></label>
-<label>Rol
-<select id="newUserRole" required>
+<label>Rol<select id="newUserRole" required>
 <option value="kullanıcı">👤 Kullanıcı</option>
 <option value="yönetici">🧑‍💼 Yönetici</option>
 <option value="admin">👑 Admin</option>
-</select>
-</label>
-<label>Şube<select id="newUserBranch" required><option value="">Şube yükleniyor...</option></select></label>
-<div id="adminBranchNote" class="muted" style="margin-top:7px;display:none">Admin için şube zorunlu değildir; Admin tüm şubeleri yönetebilir.</div>
+</select></label>
+<label>Şube<select id="newUserBranch"><option value="">Şube seç...</option></select></label>
+<div id="adminBranchNote" class="muted" style="margin-top:7px;display:none">Admin ve Yönetici için şube seçilmez; bu roller tüm şubeleri görebilir.</div>
 <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
 </form></div>
 <div class="card"><b>Veri</b><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="secondary" id="export">JSON yedekle</button><button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button></div></div></section>
@@ -214,16 +212,27 @@ function updateUserRoleForm(){
   const branch=$('newUserBranch');
   const note=$('adminBranchNote');
   const btn=$('createUserBtn');
-  const isAdmin=role==='admin';
+  const allBranches=role==='admin'||role==='yönetici';
 
   if(branch){
-    branch.required=!isAdmin;
-    branch.disabled=isAdmin;
-    if(isAdmin) branch.value='';
+    branch.required=!allBranches;
+    branch.disabled=allBranches;
+    if(allBranches) branch.value='';
   }
-  if(note) note.style.display=isAdmin?'block':'none';
+
+  if(note){
+    note.style.display=allBranches?'block':'none';
+    note.textContent=role==='admin'
+      ? 'Admin için şube seçilmez; Admin tüm şubeleri yönetebilir.'
+      : 'Yönetici için şube seçilmez; Yönetici tüm şubeleri görebilir.';
+  }
+
   if(btn){
-    btn.textContent=isAdmin?'👑 Admin oluştur':role==='yönetici'?'🧑‍💼 Yönetici oluştur':'👤 Kullanıcı oluştur';
+    btn.textContent=role==='admin'
+      ? '👑 Admin oluştur'
+      : role==='yönetici'
+        ? '🧑‍💼 Yönetici oluştur'
+        : '👤 Kullanıcı oluştur';
   }
 }
 
@@ -239,7 +248,8 @@ async function createUserFromAdmin(e){
 
   if(!fullName||!username||!password)return toast('Ad soyad, kullanıcı adı ve şifre zorunludur.');
   if(password.length<6)return toast('Şifre en az 6 karakter olmalıdır.');
-  if(role!=='admin'&&!branchId)return toast('Kullanıcı ve Yönetici için şube seçmelisin.');
+  if(!['admin','yönetici','kullanıcı'].includes(role))return toast('Geçersiz rol.');
+  if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
 
   const btn=$('createUserBtn'),msg=$('userCreateMsg');
   btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
@@ -260,7 +270,7 @@ async function createUserFromAdmin(e){
         username,
         password,
         role,
-        branch_id:role==='admin'?null:branchId
+        branch_id:role==='kullanıcı'?branchId:null
       })
     });
 
@@ -268,7 +278,8 @@ async function createUserFromAdmin(e){
     try{result=await response.json()}catch(_){}
     if(!response.ok){
       const detail=result?.error||result?.message||`Sunucu hatası (${response.status})`;
-      throw new Error(detail);
+      const extra=result?.detail?` — ${result.detail}`:'';
+      throw new Error(detail+extra);
     }
     if(!result?.success)throw new Error(result?.error||'Kullanıcı oluşturulamadı.');
 
@@ -301,7 +312,8 @@ $('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange
 $('save').onclick=()=>{let cat=$('category').value,name=$('productTemplate').value,exp=$('expiry').value;if(!cat||!name||!exp)return toast('Kategori, ürün ve SKT gerekli');let code=$('barcode').value.trim();let data={name,category:cat,expiry:exp,qty:Number($('qty').value)||0,unit:$('unit').value,barcode:code,note:$('note').value.trim()};if(code){db.barcodeMap[code]={category:cat,name:name}}if(db.editId){let p=db.products.find(x=>x.id===db.editId);if(p)Object.assign(p,data);toast(code?'Stok kaydı güncellendi · barkod ürüne tanımlandı':'Stok kaydı güncellendi')}else{db.products.push({...data,id:crypto.randomUUID()});toast(code?'Stok kaydı eklendi · barkod ürüne tanımlandı':'Stok kaydı eklendi')}save();resetForm();show('products')}
 $('cancelEdit').onclick=()=>{resetForm();show('products')};
 $('newCategoryInline').onclick=()=>{addCat()};$('newProductInline').onclick=()=>{let c=$('category').value;if(c)addCatalogProduct(c);else toast('Önce kategori seç')};$('addCat').onclick=addCat;
-$('newUserRole')?.addEventListener('change',updateUserRoleForm);$('createUserForm')?.addEventListener('submit',createUserFromAdmin);
+$('newUserRole')?.addEventListener('change',updateUserRoleForm);
+$('createUserForm')?.addEventListener('submit',createUserFromAdmin);
 function openCategoryModal(mode,c){
   let old=document.getElementById('categoryModal'); if(old)old.remove();
   const isEdit=mode==='edit'; const currentIcon=isEdit?catIcon(c):'📦';
