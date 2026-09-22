@@ -85,7 +85,7 @@ async function loginWithUsername(username,password){
   const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
   if(error||!data?.user) throw new Error('Kullanıcı adı veya şifre hatalı.');
   const {data:profile,error:profileError}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',data.user.id).single();
-  if(profileError||!profile||!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Kullanıcı profili aktif değil.');}
+  if(profileError){await supabaseClient.auth.signOut();throw new Error('Profil okunamadı: '+(profileError.message||profileError.code||'bilinmeyen hata'));} if(!profile){await supabaseClient.auth.signOut();throw new Error('Profil bulunamadı.');} if(!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Profil pasif görünüyor.');}
   sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));
   return profile;
 }
