@@ -1,1 +1,31 @@
-{"name":"BarSKT","short_name":"BarSKT","start_url":"./","display":"standalone","background_color":"#f4f7f5","theme_color":"#0b7a53","icons":[]}
+{
+  "name": "NN BarBoss",
+  "short_name": "NN BarBoss",
+  "description": "NumNum BarBoss - Bar ürünleri ve SKT takip uygulaması",
+  "start_url": "./BarBoss_V19_SKTRenkli.html?v=1.2",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#087f45",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
