@@ -1229,5 +1229,12 @@ async function lookup(code){code=String(code||'').trim();if(!code)return;
 function findCat(p){let c=((p.categories_tags||[]).join(' ')+' '+(p.categories||'')).toLowerCase();if(/beer|bira/.test(c))return'Bira';if(/wine|şarap/.test(c))return'Şarap';if(/vodka/.test(c))return'Vodka';if(/gin/.test(c))return'Gin';if(/whisky|whiskey/.test(c))return'Whisky';if(/rum/.test(c))return'Rum';if(/tequila/.test(c))return'Tequila';if(/liqueur|likör/.test(c))return'Likör';if(/soft-drink|soda|cola|lemonade|meşrubat/.test(c))return'Soft İçecekler';return null}
 $('scanBarcode').onclick=startScanner;$('closeScanner').onclick=stopScanner;$('manualBtn').onclick=()=>{stopScanner();$('barcode').focus()};$('torchBtn').onclick=async()=>{let t=$('barcodeVideo').srcObject?.getVideoTracks?.()[0];try{let c=t?.getCapabilities?.();if(c?.torch)await t.applyConstraints({advanced:[{torch:!(t.getSettings().torch===true)}]});else toast('Bu kamerada ışık kontrolü yok')}catch(e){toast('Işık açılamadı')}};
 initAuth();
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('./sw.js?v=1.0',{updateViaCache:'none'});
+      await reg.update();
+    }catch(e){}
+  });
+}
 </script></body></html>
