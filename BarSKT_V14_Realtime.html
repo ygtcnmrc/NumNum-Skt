@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b7a53"><title>SUPABASE KATALOG TEST V2 - BarSKT</title>
+<style>
+nav{overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;min-width:82px}
+
+:root{--g:#087b55;--g2:#075a3e;--bg:#f4f7f5;--card:#fff;--text:#18221e;--muted:#68756e;--danger:#c62828;--warn:#d97706;--ok:#15803d;--blue:#2563eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--text)}
+header{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;padding:20px 16px 18px;border-radius:0 0 25px 25px}h1{margin:0;font-size:26px}.sub{opacity:.84;font-size:13px;margin-top:3px}.container{max-width:820px;margin:auto;padding:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:14px}.stat{background:#ffffff19;padding:10px 8px;border-radius:13px}.stat b{display:block;font-size:20px}.stat span{font-size:10px;opacity:.9}.statBtn{border:0;color:#fff;text-align:left;cursor:pointer;font:inherit;width:100%}.statBtn:active{transform:scale(.98)}
+nav{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;background:#fff;padding:8px;border-radius:15px;margin:12px 0;box-shadow:0 2px 10px #0000000b}nav button{border:0;background:transparent;padding:9px 2px;border-radius:10px;color:var(--muted);font-weight:700;font-size:11px}nav button.active{background:#e3f3ed;color:var(--g)}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 2px 12px #0000000a}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.muted{color:var(--muted);font-size:12px}.pill{padding:5px 8px;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap}.danger{background:#fee2e2;color:var(--danger)}.warn{background:#ffedd5;color:var(--warn)}.ok{background:#dcfce7;color:var(--ok)}.blue{background:#dbeafe;color:#1d4ed8}
+button.primary{background:var(--g);color:white;border:0;border-radius:12px;padding:12px 15px;font-weight:800}button.secondary{background:#eef2ef;border:0;border-radius:12px;padding:11px 13px;color:#23332b;font-weight:700}button.icon{border:0;background:#eef2ef;border-radius:10px;padding:8px}.dangerBtn{background:#fee2e2!important;color:#b91c1c!important}
+input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px}label{font-size:12px;color:var(--muted);display:block;margin:10px 0 0}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.search{position:relative}.search input{padding-left:38px}.search span{position:absolute;left:13px;top:15px}.item h3{margin:0;font-size:16px}.item p{margin:5px 0}.empty{text-align:center;color:var(--muted);padding:35px 10px}.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:9px}.toolbar>*{flex:1}.hidden{display:none!important}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#17221d;color:#fff;padding:12px 16px;border-radius:12px;z-index:30;font-size:13px;max-width:90%;box-shadow:0 5px 20px #0004}
+.sectionTitle{font-size:14px;font-weight:800;margin:18px 0 8px}.catChip{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;margin:7px 0}.small{font-size:11px}.actions{display:flex;gap:6px;flex-wrap:wrap}.productSelectNote{background:#eef8f4;border-radius:10px;padding:9px;font-size:11px;color:#356253;margin-top:8px}.iconGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px}.emojiBtn{border:1px solid #e1e7e3;background:#f7faf8;border-radius:12px;padding:10px 4px;font-size:24px;cursor:pointer}.emojiBtn.selected{border:2px solid var(--g);background:#e5f4ee}.catIconPreview{font-size:30px;line-height:1}
+@media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.toolbar{display:grid;grid-template-columns:1fr}.toolbar>*{width:100%}}
+
+/* Login */
+#loginScreen{position:fixed;inset:0;background:linear-gradient(145deg,#087b55,#075a3e);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.loginBox{width:100%;max-width:390px;background:#fff;border-radius:24px;padding:26px 22px;box-shadow:0 18px 60px #0004}
+.loginLogo{text-align:center;font-size:42px;line-height:1;margin-bottom:8px}.loginTitle{text-align:center;font-size:25px;font-weight:900;color:#18221e}.loginSub{text-align:center;color:#68756e;font-size:13px;margin:5px 0 20px}.loginBox label{margin-top:12px}.loginBox input{margin-top:6px}.loginBtn{width:100%;margin-top:18px;padding:14px!important;font-size:15px}.loginError{color:#b91c1c;background:#fee2e2;border-radius:10px;padding:10px 12px;font-size:12px;margin-top:12px}.loginLoading{text-align:center;color:#68756e;font-size:12px;margin-top:10px}.userStat{background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;padding:10px}.userStat b{display:block;font-size:20px}.userStat span{font-size:11px;color:var(--muted)}.userRow{border:1px solid #e8eeea;border-radius:14px;padding:12px;margin-top:9px}.userRow .meta{font-size:11px;color:var(--muted);margin-top:3px}.userActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.roleBadge{padding:4px 7px;border-radius:20px;background:#e3f3ed;color:var(--g2);font-size:10px;font-weight:800}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}.branchBar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:11px;background:#ffffff16}.branchBar span{font-size:11px;opacity:.9;white-space:nowrap}.branchBar select{margin:0;flex:1;padding:8px 10px;border:0;border-radius:9px;background:#fff;color:var(--g2);font-weight:800;font-size:12px;min-width:0}.branchBar select:disabled{opacity:.9}
+
+.menuWrap{position:relative;display:inline-flex;flex:0 0 auto}.menuBtn{font-size:22px;line-height:1;min-width:38px}.actionMenu{position:absolute;right:0;top:calc(100% + 5px);z-index:80;min-width:190px;background:#fff;border:1px solid #dfe7e2;border-radius:12px;box-shadow:0 10px 28px #0002;padding:5px}.actionMenu button{display:block;width:100%;border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:8px;font:inherit}.actionMenu button:hover{background:#f1f6f3}.actionMenu .dangerText{color:#b91c1c}.categoryCard{padding:0;overflow:visible}.categoryCard summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px}.categoryCard summary::-webkit-details-marker{display:none}.categoryProducts{padding:0 14px 14px}.categoryProductRow{padding:9px 0;border-top:1px solid #f0f2f1;min-height:42px}.categoryProductRow .small{flex:1}.</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<body>
+<div id="loginScreen">
+  <div class="loginBox">
+    <div class="loginLogo">🍸</div>
+    <div class="loginTitle">NumNum SKT</div>
+    <div class="loginSub">Bar ürünleri & SKT takip</div>
+    <form id="loginForm" autocomplete="on">
+      <label>Kullanıcı adı<input id="loginUsername" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Kullanıcı adınız" required></label>
+      <label>Şifre<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifreniz" required></label>
+      <button class="primary loginBtn" type="submit" id="loginBtn">Giriş Yap</button>
+      <div id="loginError" class="loginError hidden"></div>
+      <div id="loginLoading" class="loginLoading hidden">Giriş yapılıyor...</div>
+    </form>
+  </div>
+</div>
+<header><div class="container" style="padding:0"><h1>🍸 BarSKT</h1><div class="sub">Bar ürünleri & SKT takip</div><div id="userBar" class="userBar"><span id="currentUserLabel">Oturum açılıyor...</span><button type="button" id="logoutBtn">Çıkış Yap</button></div><div id="branchBar" class="branchBar hidden"><span>🏢 Şube</span><select id="branchSwitcher" aria-label="Aktif şube"></select></div><div class="stats">
+<button class="stat statBtn" id="statAll"><b id="total">0</b><span>Toplam stok · tümü</span></button><button class="stat statBtn" id="stat30"><b id="d30">0</b><span>30 gün · 30-16</span></button><button class="stat statBtn" id="stat15"><b id="d15">0</b><span>15 gün · 15-6</span></button><button class="stat statBtn" id="stat5"><b id="d5">0</b><span>5 gün · 5-0</span></button></div></div></header>
+<div class="container"><nav>
+<button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="categoriesPage">🗂️<br>Kategoriler</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="userAdd" class="adminNav hidden">👤<br>Kullanıcı Ekle</button><button data-page="userManage" class="adminNav hidden">👥<br>Kullanıcı Yönetimi</button><button data-page="branchManage" class="adminNav hidden">🏢<br>Şube Yönetimi</button><button data-page="settings" class="adminNav hidden">⚙️<br>Ayarlar</button></nav>
+<section id="home" class="page"><div class="card"><div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div><div id="alerts"></div></div></section>
+<section id="products" class="page hidden"><div class="toolbar"><div class="search"><span>🔎</span><input id="search" placeholder="Ürün ara..."></div><select id="filter"><option value="">Tüm kategoriler</option></select></div><div id="productList"></div></section>
+<section id="add" class="page hidden"><div class="card"><b id="formTitle">Yeni stok kaydı</b>
+<label>1. Kategori<select id="category"></select></label>
+<div class="productSelectNote">Önce kategori seç. Sonra o kategoriye tanımlı ürünler listelenecek.</div>
+<label>2. Ürün<select id="productTemplate"></select></label>
+<div style="display:flex;gap:7px;margin-top:8px"><button class="secondary" id="newCategoryInline">➕ Kategori</button><button class="secondary" id="newProductInline">➕ Ürün</button></div>
+<label>SKT<input id="expiry" type="date"></label><div class="grid2"><label>Miktar<input id="qty" type="number" min="0" value="1"></label><label>Birim<select id="unit"><option>Adet</option><option>Kutu</option><option>Şişe</option><option>Fıçı</option><option>Kg</option><option>Litre</option><option>Paket</option></select></label></div>
+<label>Barkod / ürün kodu<div style="display:flex;gap:7px;align-items:center"><input id="barcode" inputmode="numeric" placeholder="İsteğe bağlı" style="flex:1"><button type="button" class="secondary" id="scanBarcode">📷 Tara</button></div></label>
+<div id="scannerBox" class="card hidden" style="padding:10px;margin-top:8px"><div class="row"><b>Barkodu kameraya göster</b><button type="button" class="icon" id="closeScanner">✕</button></div><div style="position:relative;margin-top:8px;background:#000;border-radius:14px;overflow:hidden"><video id="barcodeVideo" playsinline muted autoplay style="width:100%;display:block;min-height:260px;object-fit:cover"></video><div style="position:absolute;left:7%;right:7%;top:35%;height:30%;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 9999px #0005"></div></div><div style="display:flex;gap:8px;margin-top:9px"><button type="button" class="secondary" id="torchBtn">🔦 Işık</button><button type="button" class="secondary" id="manualBtn">⌨️ Elle gir</button></div><div class="muted" style="margin-top:8px">Telefonu barkoda paralel tut. Yansıma varsa açıyı değiştir.</div></div>
+<label>Not / Raf<input id="note" placeholder="Örn. Bar depo / Raf 2"></label><div style="display:flex;gap:8px;margin-top:14px"><button class="primary" id="save">Kaydet</button><button class="secondary hidden" id="cancelEdit">Vazgeç</button></div></div></section>
+<section id="categoriesPage" class="page hidden"><div class="card"><div class="row"><div><b>🗂️ Kategoriler</b><div class="muted" style="margin-top:4px">Tüm kategorileri ve içindeki ürünleri görüntüleyebilirsin.</div></div><button class="primary hidden" id="addCat">➕ Yeni kategori</button></div><div id="manageCats" style="margin-top:12px"></div></div></section>
+<section id="userAdd" class="page hidden">
+<div class="card hidden" id="userManagementCard"><b>👥 Kullanıcı Yönetimi</b><p class="muted">Yeni kullanıcı oluştur. Kullanıcı yalnızca seçtiğin şubeye erişebilir.</p>
+<form id="createUserForm" autocomplete="off">
+<label>Ad Soyad<input id="newUserFullName" type="text" placeholder="Örn. Ahmet Yılmaz" autocomplete="name" required></label>
+<label>Kullanıcı adı<input id="newUserUsername" type="text" placeholder="Örn. ahmet" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
+<label>Şifre<input id="newUserPassword" type="password" placeholder="En az 6 karakter" autocomplete="new-password" minlength="6" required></label>
+<label>Rol<select id="newUserRole"><option value="kullanıcı">👤 Kullanıcı</option><option value="yönetici">🧑‍💼 Yönetici</option><option value="admin">👑 Admin</option></select></label>
+<label>Şube<select id="newUserBranch"><option value="">Şube seç...</option></select></label>
+<div id="newUserRoleNote" class="productSelectNote">Kullanıcı seçildiğinde yalnızca seçilen şubeye erişir.</div>
+<div style="display:flex;gap:8px;align-items:center;margin-top:14px"><button class="primary" type="submit" id="createUserBtn">👤 Kullanıcı oluştur</button><span id="userCreateMsg" class="muted"></span></div>
+</form></div>
+</section>
+<section id="userManage" class="page hidden">
+<div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
+</section>
+<section id="settings" class="page hidden">
+<div class="card" id="adminDataCard">
+  <div class="row">
+    <div>
+      <b>⚙️ Ayarlar</b>
+      <div class="muted" style="margin-top:4px">Veri yedekleme ve veri yönetimi.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+    <button class="secondary" id="export">JSON yedekle</button>
+    <button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button>
+  </div>
+</div>
+</section>
+<section id="branchManage" class="page hidden">
+<div class="card hidden" id="branchManagementCard"><div class="row"><div><b>🏢 Şube Yönetimi</b><div class="muted" style="margin-top:4px">Şube ekle, adını değiştir veya aktif/pasif durumunu yönet.</div></div><button class="secondary" id="refreshBranches">↻ Yenile</button></div><div style="display:flex;gap:8px;margin-top:12px"><input id="newBranchName" type="text" placeholder="Yeni şube adı" autocomplete="off" style="margin-top:0;flex:1"><button class="primary" id="addBranchBtn">➕ Ekle</button></div><div id="branchesAdminList" style="margin-top:12px"></div></div>
+</section>
+<footer></footer></div><div id="toast" class="toast hidden"></div>
+
+<script>
+
+const SUPABASE_URL='https://kjigojputuojurfclwng.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_9Z6eSKH4riiIIhk6nvKAwA_Qcq6V2kO';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const APP_AUTH_KEY='barskt_auth_v1';
+let currentProfile=null;
+let branchesCache=[];
+let selectedBranchId=sessionStorage.getItem("barskt_selected_branch")||null;
+let stockRealtimeChannel=null;
+let stockRealtimeTimer=null;
+
+function scheduleStockRealtimeRefresh(){
+  clearTimeout(stockRealtimeTimer);
+  stockRealtimeTimer=setTimeout(async()=>{
+    try{
+      await syncStockFromSupabase();
+      if(typeof render==='function') render();
+    }catch(err){
+      console.warn('Realtime stok yenileme hatası:',err);
+    }
+  },180);
+}
+
+function startStockRealtime(){
+  if(stockRealtimeChannel){
+    try{supabaseClient.removeChannel(stockRealtimeChannel);}catch(_){ }
+    stockRealtimeChannel=null;
+  }
+  stockRealtimeChannel=supabaseClient
+    .channel('barskt-stock-records-live')
+    .on('postgres_changes',{
+      event:'*',
+      schema:'public',
+      table:'stock_records'
+    },payload=>{
+      const changedBranchId=payload.new?.branch_id||payload.old?.branch_id;
+      const activeBranchId=selectedBranchId||currentProfile?.branch_id;
+      if(!changedBranchId||!activeBranchId)return;
+      if(String(changedBranchId)!==String(activeBranchId))return;
+      scheduleStockRealtimeRefresh();
+    })
+    .subscribe((status,error)=>{
+      if(error) console.warn('Supabase Realtime bağlantı hatası:',error);
+      else if(status==='SUBSCRIBED') console.log('BarSKT stok Realtime aktif.');
+    });
+}
+
+function stopStockRealtime(){
+  clearTimeout(stockRealtimeTimer);
+  stockRealtimeTimer=null;
+  if(stockRealtimeChannel){
+    try{supabaseClient.removeChannel(stockRealtimeChannel);}catch(_){ }
+    stockRealtimeChannel=null;
+  }
+}
+
+function setLoginBusy(busy){
+  const btn=document.getElementById('loginBtn'), loading=document.getElementById('loginLoading');
+  if(btn){btn.disabled=busy;btn.style.opacity=busy?.7:1;btn.textContent=busy?'Giriş yapılıyor...':'Giriş Yap'}
+  loading?.classList.toggle('hidden',!busy);
+}
+function showLoginError(msg){
+  const el=document.getElementById('loginError');
+  if(el){el.textContent=msg;el.classList.remove('hidden')}
+}
+function hideLoginError(){document.getElementById('loginError')?.classList.add('hidden')}
+async function showApp(){
+  document.getElementById('loginScreen')?.classList.add('hidden');
+  document.body.classList.remove('authLocked');
+  const role=String(currentProfile?.role||'').trim().toLowerCase();
+  const name=currentProfile?.full_name||'Kullanıcı';
+  const label=document.getElementById('currentUserLabel');
+  if(label) label.textContent=`${name} · ${role==='admin'?'Admin':role==='yönetici'?'Yönetici':'Kullanıcı'}`;
+  const manageNav=document.querySelector('nav button[data-page="manage"]');
+  if(manageNav) manageNav.classList.toggle('hidden',role!=='admin');
+  await loadBranchSwitcher();
+  startStockRealtime();
+  // Her açılışta Supabase'deki güncel global kataloğu yeniden çek.
+  // Böylece daha önce localStorage'a kalmış eski V8 kataloğu ekranda kalmaz.
+  if(currentProfile?.id) await syncCatalogFromSupabase();
+}
+async function loadBranchSwitcher(){
+  const bar=document.getElementById('branchBar');
+  const sel=document.getElementById('branchSwitcher');
+  if(!bar||!sel||!currentProfile)return;
+  const role=String(currentProfile.role||'').trim().toLowerCase();
+  if(!['admin','yönetici','kullanıcı'].includes(role)){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  const {data,error}=await supabaseClient.from('branches').select('id,name,is_active').eq('is_active',true).order('name');
+  if(error){bar.classList.add('hidden');toast('Şubeler yüklenemedi.');return;}
+  branchesCache=data||[];
+  const activeBranches=branchesCache.filter(b=>b.is_active);
+  if(role==='kullanıcı'){
+    const own=activeBranches.find(b=>b.id===currentProfile.branch_id);
+    selectedBranchId=own?.id||currentProfile.branch_id||null;
+    if(selectedBranchId)sessionStorage.setItem('barskt_selected_branch',selectedBranchId);
+    sel.innerHTML=own?`<option value="${own.id}">${esc(own.name)}</option>`:'<option>Şube tanımsız</option>';
+    sel.disabled=true;
+  }else{
+    let activeId=selectedBranchId;
+    if(!activeId||!activeBranches.some(b=>b.id===activeId))activeId=activeBranches[0]?.id||null;
+    selectedBranchId=activeId;
+    if(activeId)sessionStorage.setItem('barskt_selected_branch',activeId);else sessionStorage.removeItem('barskt_selected_branch');
+    sel.innerHTML=activeBranches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    sel.value=activeId||'';
+    sel.disabled=false;
+    sel.onchange=async()=>{
+      selectedBranchId=sel.value||null;
+      if(selectedBranchId)sessionStorage.setItem('barskt_selected_branch',selectedBranchId);else sessionStorage.removeItem('barskt_selected_branch');
+      const branch=activeBranches.find(b=>b.id===selectedBranchId);
+      toast(branch?`${branch.name} şubesi seçildi.`:'Şube seçilmedi.');
+      await syncStockFromSupabase();
+    };
+  }
+  await syncStockFromSupabase();
+}
+
+function getActiveBranch(){return branchesCache.find(b=>b.id===selectedBranchId)||branchesCache.find(b=>b.id===currentProfile?.branch_id)||null}
+function showLogin(){document.getElementById('loginScreen')?.classList.remove('hidden')}
+async function logout(){
+  stopStockRealtime();
+  await supabaseClient.auth.signOut();
+  currentProfile=null;
+  selectedBranchId=null;
+  sessionStorage.removeItem(APP_AUTH_KEY);
+  sessionStorage.removeItem('barskt_selected_branch');
+  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!=='home'));
+  document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page==='home'));
+  showLogin();
+  $('loginPassword').value='';
+  hideLoginError();
+}
+
+async function loginWithUsername(username,password){
+  username=String(username||'').trim();
+  if(!username||!password) throw new Error('Kullanıcı adı ve şifre gerekli.');
+  const {data:emailData,error:emailError}=await supabaseClient.rpc('get_login_email',{p_username:username});
+  if(emailError) throw new Error('Giriş servisine bağlanılamadı.');
+  const email=typeof emailData==='string'?emailData:(Array.isArray(emailData)?emailData[0]?.auth_email:null);
+  if(!email) throw new Error('Kullanıcı adı veya şifre hatalı.');
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error||!data?.user) throw new Error('Kullanıcı adı veya şifre hatalı.');
+  const {data:profile,error:profileError}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',data.user.id).single();
+  if(profileError){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile){await supabaseClient.auth.signOut();throw new Error('Giriş yapılamadı. Lütfen tekrar deneyin.');} if(!profile.is_active){await supabaseClient.auth.signOut();throw new Error('Hesabınız aktif değil.');}
+  currentProfile=profile;
+  sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));
+  await syncCatalogFromSupabase();
+  return profile;
+}
+
+
+async function writeAudit({branchId,productId,action,fieldName=null,oldValue=null,newValue=null}){
+  try{
+    const {error}=await supabaseClient.from('audit_logs').insert({
+      user_id:currentProfile?.id||null,
+      branch_id:branchId||selectedBranchId||null,
+      product_id:productId||null,
+      action,
+      field_name:fieldName,
+      old_value:oldValue==null?null:String(oldValue),
+      new_value:newValue==null?null:String(newValue)
+    });
+    if(error) console.warn('Audit log yazılamadı:',error.message);
+  }catch(e){console.warn('Audit log hatası:',e)}
+}
+
+async function syncStockFromSupabase(){
+  const branchId=selectedBranchId||currentProfile?.branch_id;
+  if(!branchId){
+    db.products=[];
+    save();
+    return;
+  }
+  try{
+    const {data,error}=await supabaseClient.from('stock_records')
+      .select('id,branch_id,product_id,expiry_date,quantity,unit,created_by,created_at,updated_at,note')
+      .eq('branch_id',branchId)
+      .order('expiry_date',{ascending:true});
+    if(error) throw error;
+    const rows=data||[];
+    db.products=rows.map(r=>{
+      const rp=catalogRemote.products?.[r.product_id];
+      const cat=rp ? catalogRemote.categories?.[rp.category_id] : null;
+      return {
+        id:r.id,
+        branch_id:r.branch_id,
+        product_id:r.product_id,
+        name:rp?.name||'Bilinmeyen ürün',
+        category:cat?.name||'Bilinmeyen kategori',
+        expiry:r.expiry_date,
+        qty:Number(r.quantity)||0,
+        unit:r.unit||rp?.unit||'Adet',
+        barcode:rp?.barcode||'',
+        note:r.note||'',
+        created_by:r.created_by||null,
+        created_at:r.created_at,
+        updated_at:r.updated_at
+      };
+    });
+    localStorage.setItem(KEY,JSON.stringify(db));
+    render();
+  }catch(err){
+    console.error('Supabase stok senkronizasyonu:',err);
+    toast('Stoklar Supabase üzerinden okunamadı.');
+  }
+}
+
+async function ensureActiveBranch(){
+  const role=String(currentProfile?.role||'').trim().toLowerCase();
+  if(role==='kullanıcı') return currentProfile?.branch_id||null;
+  if(selectedBranchId)return selectedBranchId;
+  if(!branchesCache.length){
+    const {data}=await supabaseClient.from('branches').select('id,name,is_active').eq('is_active',true).order('name');
+    branchesCache=data||[];
+  }
+  selectedBranchId=branchesCache.find(b=>b.is_active)?.id||null;
+  if(selectedBranchId)sessionStorage.setItem('barskt_selected_branch',selectedBranchId);
+  return selectedBranchId;
+}
+
+async function initAuth(){
+  const form=document.getElementById('loginForm');
+  form?.addEventListener('submit',async e=>{
+    e.preventDefault();hideLoginError();setLoginBusy(true);
+    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);await showApp();render();toast('Hoş geldin 👋');}
+    catch(err){showLoginError(err?.message||'Giriş yapılamadı.');}
+    finally{setLoginBusy(false)}
+  });
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(session?.user){
+    const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
+    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));await syncCatalogFromSupabase();await showApp();render();return;}
+    await supabaseClient.auth.signOut();
+  }
+  showLogin();
+}
+
+
+// ================= SUPABASE GLOBAL CATALOG TEST =================
+// Bu sürümde yalnızca kategori/ürün kataloğu Supabase'e bağlanır.
+// Stok/SKT, barkod eşlemesi ve diğer yerel işlevler şimdilik korunur.
+let catalogRemote={categories:{},products:{}};
+let catalogSyncReady=false;
+
+async function syncCatalogFromSupabase(){
+  try{
+    const {data:cats,error:catErr}=await supabaseClient
+      .from('categories').select('id,name,icon,is_active,sort_order').eq('is_active',true).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    if(catErr) throw catErr;
+    const remoteCats=cats||[];
+
+    // İlk kurulum: Supabase kataloğu boşsa mevcut V8 kataloğunu bir kez taşır.
+    if(remoteCats.length===0){
+      const localBase=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('barskt_v4')||'null');
+      const sourceCats=(localBase?.categories?.length?localBase.categories:Object.keys(seed));
+      const sourceCatalog=localBase?.catalog||seed;
+      if(String(currentProfile?.role||'').toLowerCase()==='admin'){
+        for(const name of sourceCats){
+          const {data:cat,error}=await supabaseClient.from('categories')
+            .insert({name,icon:(localBase?.categoryIcons?.[name]||defaultIcons[name]||'📦'),is_active:true})
+            .select('id,name,icon,is_active').single();
+          if(error) throw error;
+          const products=[...(sourceCatalog[name]||[])].map(n=>({category_id:cat.id,name:n,unit:'Adet',is_active:true}));
+          if(products.length){
+            const {error:pe}=await supabaseClient.from('products').insert(products);
+            if(pe) throw pe;
+          }
+        }
+      }
+      // Admin olmayan ilk kullanıcıda katalog henüz yoksa seed/local gösterilir; sonraki girişte admin taşır.
+    }
+
+    const {data:finalCats,error:finalCatErr}=await supabaseClient
+      .from('categories').select('id,name,icon,is_active,sort_order').eq('is_active',true).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    if(finalCatErr) throw finalCatErr;
+    const activeCats=finalCats||[];
+    const {data:prods,error:prodErr}=await supabaseClient
+      .from('products').select('id,category_id,name,barcode,unit,is_active,sort_order').eq('is_active',true).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    if(prodErr) throw prodErr;
+
+    catalogRemote={categories:{},products:{}};
+    activeCats.forEach(c=>catalogRemote.categories[c.id]=c);
+    (prods||[]).forEach(p=>catalogRemote.products[p.id]=p);
+
+    // Supabase global katalogu yerel görünümün kaynağı yap.
+    db.categories=activeCats.map(c=>c.name);
+    db.catalog={};
+    db.categoryIcons={};
+    activeCats.forEach(c=>{db.catalog[c.name]=[];db.categoryIcons[c.name]=c.icon||'📦'});
+    (prods||[]).forEach(p=>{
+      const c=catalogRemote.categories[p.category_id];
+      if(!c)return;
+      if(!db.catalog[c.name])db.catalog[c.name]=[];
+      db.catalog[c.name].push(p.name);
+    });
+    db.remoteCategoryIds={};
+    db.remoteProductIds={};
+    activeCats.forEach(c=>db.remoteCategoryIds[c.name]=c.id);
+    (prods||[]).forEach(p=>{const c=catalogRemote.categories[p.category_id];if(c)db.remoteProductIds[`${c.name}|||${p.name}`]=p.id});
+    catalogSyncReady=true;
+    localStorage.setItem(KEY,JSON.stringify(db));
+    // Supabase katalog senkronizasyonu tamamlandı: tüm aktif kategori/ürünler
+    // yerel görünümü tamamen yeniden oluşturur. Eski tarayıcı cache'i kullanılmaz.
+    render();
+  }catch(err){
+    catalogSyncReady=false;
+    console.error('Supabase katalog senkronizasyonu:',err);
+    toast('Katalog Supabase bağlantısı kurulamadı. İnternet/RLS bağlantısını kontrol et.');
+  }
+}
+
+function adminOnlyCatalog(){
+  if(String(currentProfile?.role||'').trim().toLowerCase()!=='admin'){
+    toast('Kategori ve ürün tanımları yalnızca Admin tarafından yönetilebilir.');
+    return false;
+  }
+  return true;
+}
+
+async function createRemoteCategory(name,icon){
+  const {data:lastCat,error:lastErr}=await supabaseClient.from('categories')
+    .select('sort_order').eq('is_active',true).order('sort_order',{ascending:false}).limit(1).maybeSingle();
+  if(lastErr) throw lastErr;
+  const nextOrder=Number(lastCat?.sort_order||0)+1;
+  const {data,error}=await supabaseClient.from('categories').insert({name,icon:icon||'📦',is_active:true,sort_order:nextOrder})
+    .select('id,name,icon,is_active,sort_order').single();
+  if(error) throw error;
+  return data;
+}
+
+async function resolveRemoteCategoryId(categoryName){
+  const cached=db.remoteCategoryIds?.[categoryName];
+  if(cached)return cached;
+  const {data,error}=await supabaseClient.from('categories')
+    .select('id,name,is_active').eq('name',categoryName).eq('is_active',true).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error('Kategori Supabase üzerinde bulunamadı.');
+  db.remoteCategoryIds=db.remoteCategoryIds||{};
+  db.remoteCategoryIds[categoryName]=data.id;
+  return data.id;
+}
+
+async function resolveRemoteProductId(categoryName,productName){
+  const key=`${categoryName}|||${productName}`;
+  const cached=db.remoteProductIds?.[key];
+  if(cached)return cached;
+  const categoryId=await resolveRemoteCategoryId(categoryName);
+  const {data,error}=await supabaseClient.from('products')
+    .select('id,name,category_id,is_active').eq('category_id',categoryId).eq('name',productName).eq('is_active',true).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error('Ürün Supabase üzerinde bulunamadı.');
+  db.remoteProductIds=db.remoteProductIds||{};
+  db.remoteProductIds[key]=data.id;
+  return data.id;
+}
+
+async function createRemoteProduct(categoryName,name){
+  const categoryId=await resolveRemoteCategoryId(categoryName);
+  const {data:last,error:lastErr}=await supabaseClient.from('products').select('sort_order').eq('category_id',categoryId).eq('is_active',true).order('sort_order',{ascending:false}).limit(1).maybeSingle();
+  if(lastErr) throw lastErr;
+  const nextOrder=Number(last?.sort_order||0)+1;
+  const {data,error}=await supabaseClient.from('products').insert({category_id:categoryId,name,unit:'Adet',is_active:true,sort_order:nextOrder})
+    .select('id,category_id,name,barcode,unit,is_active,sort_order').single();
+  if(error) throw error;
+  return data;
+}
+
+async function updateRemoteCategory(oldName,newName,icon){
+  const id=await resolveRemoteCategoryId(oldName);
+  const {error}=await supabaseClient.from('categories').update({name:newName,icon:icon||'📦'}).eq('id',id);
+  if(error) throw error;
+}
+
+async function updateRemoteProduct(categoryName,oldName,newName){
+  const id=await resolveRemoteProductId(categoryName,oldName);
+  const {error}=await supabaseClient.from('products').update({name:newName}).eq('id',id);
+  if(error) throw error;
+}
+
+async function softDeleteRemoteProduct(categoryName,name){
+  const id=await resolveRemoteProductId(categoryName,name);
+  const {error}=await supabaseClient.from('products').update({is_active:false}).eq('id',id);
+  if(error) throw error;
+}
+
+async function moveRemoteProduct(categoryName,name,targetCategoryName){
+  const id=await resolveRemoteProductId(categoryName,name);
+  const targetId=await resolveRemoteCategoryId(targetCategoryName);
+  const {data:last,error:lastErr}=await supabaseClient.from('products').select('sort_order').eq('category_id',targetId).eq('is_active',true).order('sort_order',{ascending:false}).limit(1).maybeSingle();
+  if(lastErr) throw lastErr;
+  const nextOrder=Number(last?.sort_order||0)+1;
+  const {error}=await supabaseClient.from('products').update({category_id:targetId,sort_order:nextOrder}).eq('id',id);
+  if(error) throw error;
+}
+
+async function softDeleteRemoteCategory(name){
+  const id=await resolveRemoteCategoryId(name);
+  const {error}=await supabaseClient.from('categories').update({is_active:false}).eq('id',id);
+  if(error) throw error;
+}
+// ============================================================
+
+const KEY='barskt_v5';
+const seed={
+'Bira':['Tuborg Frederik Märzen Lager','Tuborg Frederik India Pale Ale','Tuborg Frederik Wheat IPA','Tuborg Frederik Yakima IPA','Tuborg Gold','Tuborg Fıçı','Tuborg Ice','Carlsberg','Carlsberg Luna','Heineken','Guinness','Sol','Budweiser','Desperados','1664 Blanc','Weihenstephan Hefeweissbier','Weihenstephan Vitus'],
+'Şarap':['Myrina Beyaz','Ancyra Narince','Ancyra Sultaniye - Emir','Santa Helena Sauvignon Blanc','Gato Negro Chardonnay','Egeo Chardonnay','Sartori Pinot Grigio','Myrina Kırmızı','Ancyra Öküzgözü','Ancyra Cabernet Sauvignon - Syrah','Ancyra Merlot','Ancyra Kalecik Karası','Ancyra Boğazkere','Santa Helena Cabernet Sauvignon','Gato Negro Cabernet Sauvignon','Egeo Merlot','Myrina Rose','Ancyra Blush','Sartori Pinot Grigio'],
+'Vodka':['Smirnoff Red','Smirnoff Acılı Vodka','Ketel One','Cîroc'],
+'Gin':['Gordon’s Gin','Gordon’s Pink Gin','Tanqueray Dry Gin','Tanqueray No. Ten'],
+'Whisky':['Johnnie Walker Black Label','Bulleit Bourbon','Talisker 10 Years','Lagavulin 16 Years','Jameson','Jack Daniel’s'],
+'Rum':['Captain Morgan White','Captain Morgan Gold'],
+'Tequila':['Don Julio Blanco','Casamigos Blanco','Casamigos Mezcal'],
+'Likör':['Baileys','Archers','Safari','Kahlua','Southern Comfort','St Germain','Chambord','Jägermeister','Maraschino','Cointreau','Skinos'],
+'Cognac & Grappa':['Remy Martin V.S.O.P.','Courvoisier V.S','Nardini Grappa'],
+'Aperitif & Vermouth':['Aperol','Campari','Martini Rosso','Martini Bianco','Vermouth','Angostura Bitter'],
+'Rakı':['Rakı'],
+'Soft İçecekler':['Coca-Cola','Sprite','Fanta','Cappy Şeftali / Vişne','Fuse Tea Limon / Şeftali','Schweppes Mandarin / Bitter Lemon / Tonic','Damla Su Cam Şişe','Damla Mineralli Maden Suyu','Ayran Sade','Ayran Naneli','Ayran Fesleğenli'],
+'Ice Tea':['Yaseminli Yeşil Ice Tea','Kırmızı Meyveli Ice Tea','Mango Ice Tea','Limonlu Ice Tea'],
+'Limonatalar':['Brezilya Limonatası','Satsumalı Limonata','Çilekli Limonata','Elmalı Limonata','Naneli Limonata','Klasik Limonata']
+};
+const defaultIcons={'Bira':'🍺','Şarap':'🍷','Vodka':'🥃','Gin':'🍸','Whisky':'🥃','Rum':'🥃','Tequila':'🌵','Likör':'🍹','Cognac & Grappa':'🥃','Aperitif & Vermouth':'🍸','Rakı':'🥃','Soft İçecekler':'🥤','Ice Tea':'🧊','Limonatalar':'🍋'};
+const iconChoices=['🍺','🍷','🥂','🍾','🥃','🍸','🍹','🌵','🥤','🧊','🍋','🧃','🥛','🧋','☕','🍵','🍺','🍶','🍹','🍊','🍓','🍏','🍍','🫗','📦','🧊','🍸','🥂','🍷','🥃'];
+const icons={...defaultIcons};
+let db=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('barskt_v4')||'null');
+let expiryRange=null;
+if(!db){
+  const old=JSON.parse(localStorage.getItem('barskt_v1')||'null');
+  db={categories:Object.keys(seed),catalog:{...seed},products:[],editId:null};
+  if(old?.products?.length) db.products=old.products.map(p=>({...p,id:p.id||crypto.randomUUID()}));
+}
+// Eski sürüm verisini mümkün olduğunca koru
+if(!db.categories) db.categories=Object.keys(seed); if(!db.catalog) db.catalog={}; if(!db.products) db.products=[]; if(!db.barcodeMap) db.barcodeMap={}; if(!db.categoryIcons) db.categoryIcons={};
+// Kategori ikonlarını geriye dönük uyumlu şekilde hazırla.
+db.categories.forEach(c=>{if(!db.categoryIcons[c]) db.categoryIcons[c]=defaultIcons[c]||'📦'});
+function catIcon(c){return db.categoryIcons[c]||defaultIcons[c]||'📦'}
+// Mevcut stoklardaki barkodları kalıcı ürün-barkod eşleştirmesine dönüştür.
+db.products.forEach(p=>{if(p.barcode&&p.name&&p.category){db.barcodeMap[p.barcode.trim()]={category:p.category,name:p.name}}});
+Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categories.push(c);if(!db.catalog[c])db.catalog[c]=[];ps.forEach(p=>{if(!db.catalog[c].includes(p))db.catalog[c].push(p)})});
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+function days(p){return Math.ceil((new Date(p.expiry+'T23:59:59')-new Date())/86400000)}
+function level(p){let d=days(p);if(d<0)return ['danger','GEÇMİŞ'];if(d===0)return ['danger','BUGÜN'];if(d<=5)return ['danger',d+' gün · 5 gün uyarısı'];if(d<=15)return ['warn',d+' gün · 15 gün uyarısı'];if(d<=30)return ['blue',d+' gün · 30 gün uyarısı'];return ['ok',d+' gün']}
+function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
+function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
+function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
+async function show(page){
+  const role=String(currentProfile?.role||'').trim().toLowerCase();
+  const adminPages=['userAdd','userManage','branchManage','settings'];
+  if(adminPages.includes(page) && role!=='admin'){
+    toast('Bu bölüm yalnızca Admin yetkisine açıktır.');
+    return;
+  }
+  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));
+  document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  if(page==='products')renderProducts();
+  if(page==='categoriesPage')renderCategoriesPage();
+  if(page==='userAdd'){
+    renderManage();
+    await loadBranchesForUserForm();
+    updateUserRoleForm();
+  }
+  if(page==='userManage'){
+    renderManage();
+    await loadUsers();
+  }
+  if(page==='branchManage'){
+    renderManage();
+    await loadBranchManagement();
+  }
+  if(page==='add')renderProductTemplate();
+  window.scrollTo({top:0,behavior:'smooth'})
+}
+document.querySelectorAll('nav button[data-page]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.page)));
+document.getElementById('logoutBtn')?.addEventListener('click',logout);
+function fillCats(){let o=db.categories.map(c=>`<option>${esc(c)}</option>`).join('');$('category').innerHTML=o;$('filter').innerHTML='<option value="">Tüm kategoriler</option>'+o}
+function renderStats(){let ps=db.products;$('total').textContent=ps.length;$('d30').textContent=ps.filter(p=>days(p)>=0&&days(p)<=30).length;$('d15').textContent=ps.filter(p=>days(p)>=0&&days(p)<=15).length;$('d5').textContent=ps.filter(p=>days(p)>=0&&days(p)<=5).length}
+function renderAlerts(){let ps=db.products.filter(p=>{let d=days(p);return d>=0&&d<=30}).sort((a,b)=>days(a)-days(b));let ex=db.products.filter(p=>days(p)<0).sort((a,b)=>days(a)-days(b));let out='';if(ex.length)out+=`<div class="sectionTitle">⛔ Süresi geçen</div>`+ex.slice(0,15).map(alertCard).join('');if(ps.length)out+=`<div class="sectionTitle">SKT yaklaşan ürünler</div>`+ps.slice(0,30).map(alertCard).join('');$('alerts').innerHTML=out||'<div class="empty">🎉 Yaklaşan SKT yok.</div>'}
+function alertCard(p){let [cl,t]=level(p);return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><div class="muted">SKT: ${fmt(p.expiry)}</div></div>`}
+function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
+function renderSummary(){}
+function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
+function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
+function jsarg(v){return JSON.stringify(v).replace(/'/g,'&#39;')}
+async function moveCategoryOrder(name,direction){
+  if(!adminOnlyCatalog())return;
+  const list=[...db.categories];
+  const index=list.indexOf(name);
+  const targetIndex=index+(direction==='up'?-1:1);
+  if(index<0||targetIndex<0||targetIndex>=list.length)return;
+  const other=list[targetIndex];
+  const currentId=db.remoteCategoryIds?.[name];
+  const otherId=db.remoteCategoryIds?.[other];
+  if(!currentId||!otherId)return toast('Kategori sırası için Supabase kayıtları bulunamadı.');
+  try{
+    const currentSort=Number(catalogRemote.categories?.[currentId]?.sort_order ?? index+1);
+    const otherSort=Number(catalogRemote.categories?.[otherId]?.sort_order ?? targetIndex+1);
+    const {error:e1}=await supabaseClient.from('categories').update({sort_order:otherSort}).eq('id',currentId);
+    if(e1)throw e1;
+    const {error:e2}=await supabaseClient.from('categories').update({sort_order:currentSort}).eq('id',otherId);
+    if(e2)throw e2;
+    [list[index],list[targetIndex]]=[list[targetIndex],list[index]];
+    db.categories=list;
+    if(catalogRemote.categories[currentId])catalogRemote.categories[currentId].sort_order=otherSort;
+    if(catalogRemote.categories[otherId])catalogRemote.categories[otherId].sort_order=currentSort;
+    save();
+    render();
+    toast(`${name} kategorisi ${direction==='up'?'yukarı':'aşağı'} taşındı.`);
+  }catch(err){
+    toast(err?.message||'Kategori sırası değiştirilemedi.');
+  }
+}
+function moveCategoryUp(name){return moveCategoryOrder(name,'up')}
+function moveCategoryDown(name){return moveCategoryOrder(name,'down')}
+
+async function moveProductOrder(categoryName,productName,direction){
+  if(!adminOnlyCatalog())return;
+  const list=[...(db.catalog[categoryName]||[])];
+  const index=list.indexOf(productName);
+  if(index<0)return;
+  const targetIndex=direction==='up'?index-1:index+1;
+  if(targetIndex<0||targetIndex>=list.length)return;
+  const otherName=list[targetIndex];
+  const currentId=db.remoteProductIds?.[`${categoryName}|||${productName}`];
+  const otherId=db.remoteProductIds?.[`${categoryName}|||${otherName}`];
+  if(!currentId||!otherId)return toast('Ürün sırası için Supabase ürün kaydı bulunamadı.');
+  try{
+    const currentSort=Number(catalogRemote.products?.[currentId]?.sort_order ?? index+1);
+    const otherSort=Number(catalogRemote.products?.[otherId]?.sort_order ?? targetIndex+1);
+    const {error:e1}=await supabaseClient.from('products').update({sort_order:otherSort}).eq('id',currentId);
+    if(e1)throw e1;
+    const {error:e2}=await supabaseClient.from('products').update({sort_order:currentSort}).eq('id',otherId);
+    if(e2)throw e2;
+    [list[index],list[targetIndex]]=[list[targetIndex],list[index]];
+    db.catalog[categoryName]=list;
+    if(catalogRemote.products[currentId])catalogRemote.products[currentId].sort_order=otherSort;
+    if(catalogRemote.products[otherId])catalogRemote.products[otherId].sort_order=currentSort;
+    save();
+    render();
+    toast(`${productName} ürünü ${direction==='up'?'yukarı':'aşağı'} taşındı.`);
+  }catch(err){
+    toast(err?.message||'Ürün sırası değiştirilemedi.');
+  }
+}
+function moveProductUp(categoryName,productName){return moveProductOrder(categoryName,productName,'up')}
+function moveProductDown(categoryName,productName){return moveProductOrder(categoryName,productName,'down')}
+
+function categoryMenu(c){
+  const id='catmenu_'+encodeURIComponent(c).replace(/%/g,'_');
+  return `<div class="menuWrap"><button class="icon menuBtn" type="button" onclick='toggleActionMenu(this,event)'>⋮</button><div class="actionMenu hidden">
+    <button type="button" onclick='moveCategoryUp(${jsarg(c)});closeActionMenus()'>⬆️ Yukarı taşı</button>
+    <button type="button" onclick='moveCategoryDown(${jsarg(c)});closeActionMenus()'>⬇️ Aşağı taşı</button>
+    <button type="button" onclick='renameCat(${jsarg(c)});closeActionMenus()'>✏️ Düzenle</button>
+    <button type="button" class="dangerText" onclick='deleteCat(${jsarg(c)});closeActionMenus()'>🗑️ Sil</button>
+  </div></div>`;
+}
+function productMenu(c,p){
+  return `<div class="menuWrap"><button class="icon menuBtn" type="button" onclick='toggleActionMenu(this,event)'>⋮</button><div class="actionMenu hidden">
+    <button type="button" onclick='moveProductUp(${jsarg(c)},${jsarg(p)});closeActionMenus()'>⬆️ Yukarı taşı</button>
+    <button type="button" onclick='moveProductDown(${jsarg(c)},${jsarg(p)});closeActionMenus()'>⬇️ Aşağı taşı</button>
+    <button type="button" onclick='renameProduct(${jsarg(c)},${jsarg(p)});closeActionMenus()'>✏️ Düzenle</button>
+    <button type="button" onclick='moveCatalogProduct(${jsarg(c)},${jsarg(p)});closeActionMenus()'>↗️ Kategoriye taşı</button>
+    <button type="button" class="dangerText" onclick='deleteCatalogProduct(${jsarg(c)},${jsarg(p)});closeActionMenus()'>🗑️ Sil</button>
+  </div></div>`;
+}
+function closeActionMenus(){document.querySelectorAll('.actionMenu:not(.hidden)').forEach(x=>x.classList.add('hidden'));}
+function toggleActionMenu(btn,event){event?.stopPropagation();const m=btn.parentElement?.querySelector('.actionMenu');if(!m)return;const wasOpen=!m.classList.contains('hidden');closeActionMenus();if(!wasOpen)m.classList.remove('hidden');}
+document.addEventListener('click',e=>{if(!e.target.closest('.menuWrap'))closeActionMenus()});
+function renderCategoriesPage(){
+  const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+  $('addCat')?.classList.toggle('hidden',!isAdmin);
+  const host=$('manageCats'); if(!host)return;
+  host.innerHTML=db.categories.map(c=>{
+    const arr=db.catalog[c]||[];
+    const products=arr.length?arr.map(p=>`<div class="row categoryProductRow"><span class="small">${esc(p)}</span>${isAdmin?productMenu(c,p):''}</div>`).join(''):'<div class="muted" style="padding:10px 0">Henüz ürün tanımlı değil.</div>';
+    return `<details class="card categoryCard"><summary><span>${catIcon(c)} ${esc(c)} <span class="muted small">(${arr.length})</span></span>${isAdmin?categoryMenu(c):''}</summary><div class="categoryProducts">${products}${isAdmin?`<button class="secondary" style="margin-top:10px" onclick='addCatalogProduct(${jsarg(c)})'>➕ Bu kategoriye ürün ekle</button>`:''}</div></details>`;
+  }).join('')||'<div class="empty">Henüz kategori yok.</div>';
+}
+function renderManage(){
+  const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+  $('userManagementCard')?.classList.toggle('hidden',!isAdmin);
+  $('usersListCard')?.classList.toggle('hidden',!isAdmin);
+  $('branchManagementCard')?.classList.toggle('hidden',!isAdmin);
+  document.querySelectorAll('.adminNav').forEach(b=>b.classList.toggle('hidden',!isAdmin));
+  updateUserRoleForm();
+}
+
+let adminManagementRefreshing=false;
+async function refreshAdminManagement(){
+  if(adminManagementRefreshing || currentProfile?.role!=='admin')return;
+  adminManagementRefreshing=true;
+  try{
+    await loadBranchManagement();
+    await loadBranchesForUserForm();
+    await loadUsers();
+    updateUserRoleForm();
+  }finally{
+    adminManagementRefreshing=false;
+  }
+}
+
+async function loadBranchManagement(){
+  if(currentProfile?.role!=='admin')return;
+  const list=$('branchesAdminList');
+  if(!list)return;
+  list.innerHTML='<div class="empty">Şubeler yükleniyor...</div>';
+  const {data,error}=await supabaseClient.from('branches').select('id,name,is_active,created_at').order('name');
+  if(error){list.innerHTML='<div class="empty">Şubeler okunamadı.</div>';toast('Şubeler yüklenemedi.');return;}
+  branchesCache=data||[];
+  list.innerHTML=branchesCache.map(b=>`<div class="userRow"><div class="row"><div><b>🏢 ${esc(b.name)}</b><div class="meta">Durum: ${b.is_active?'Aktif':'Pasif'}</div></div><span class="roleBadge" style="background:${b.is_active?'#dcfce7':'#fee2e2'};color:${b.is_active?'#15803d':'#b91c1c'}">${b.is_active?'🟢 Aktif':'🔴 Pasif'}</span></div><div class="userActions"><button class="secondary" onclick='renameBranch(${jsarg(b.id)},${jsarg(b.name)})'>✏️ Düzenle</button><button class="secondary" onclick='toggleBranch(${jsarg(b.id)},${jsarg(b.name)},${b.is_active})'>${b.is_active?'🔴 Pasif yap':'🟢 Aktif yap'}</button><button class="secondary dangerBtn" onclick='deleteBranch(${jsarg(b.id)},${jsarg(b.name)})'>🗑️ Sil</button></div></div>`).join('')||'<div class="empty">Henüz şube yok.</div>';
+}
+
+async function addBranch(){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  const input=$('newBranchName');
+  const name=(input?.value||'').trim();
+  if(!name)return toast('Şube adı gerekli.');
+  const duplicate=branchesCache.some(b=>b.name.trim().toLocaleLowerCase('tr-TR')===name.toLocaleLowerCase('tr-TR'));
+  if(duplicate)return toast('Bu şube zaten mevcut.');
+  const {data,error}=await supabaseClient.from('branches').insert({name,is_active:true}).select('id,name,is_active,created_at').single();
+  if(error){toast(error.message||'Şube oluşturulamadı.');return;}
+  if(input)input.value='';
+  toast(`${data.name} şubesi oluşturuldu.`);
+  await loadBranchManagement();
+  await loadBranchesForUserForm();
+}
+
+async function renameBranch(id,oldName){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  const name=prompt('Yeni şube adı:',oldName);
+  if(name===null)return;
+  const clean=name.trim();
+  if(!clean)return toast('Şube adı boş olamaz.');
+  const duplicate=branchesCache.some(b=>b.id!==id&&b.name.trim().toLocaleLowerCase('tr-TR')===clean.toLocaleLowerCase('tr-TR'));
+  if(duplicate)return toast('Bu şube adı zaten mevcut.');
+  const {error}=await supabaseClient.from('branches').update({name:clean}).eq('id',id);
+  if(error){toast(error.message||'Şube güncellenemedi.');return;}
+  if(selectedBranchId===id)sessionStorage.setItem('barskt_selected_branch',id);
+  toast('Şube adı güncellendi.');
+  await loadBranchManagement();
+  await loadBranchesForUserForm();
+  await loadUsers();
+}
+
+async function toggleBranch(id,name,isActive){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  if(isActive){
+    const assigned=await supabaseClient.from('profiles').select('id',{count:'exact',head:true}).eq('branch_id',id).eq('is_active',true);
+    if(assigned.error){toast('Kullanıcı kontrolü yapılamadı.');return;}
+    if((assigned.count||0)>0){
+      if(!confirm(`${name} şubesinde ${(assigned.count||0)} aktif kullanıcı var. Şubeyi pasif yaparsan bu kullanıcılar girişte erişim sorunu yaşayabilir. Devam edilsin mi?`))return;
+    }
+  }
+  const {error}=await supabaseClient.from('branches').update({is_active:!isActive}).eq('id',id);
+  if(error){toast(error.message||'Şube durumu değiştirilemedi.');return;}
+  toast(`${name} ${!isActive?'aktif':'pasif'} yapıldı.`);
+  await loadBranchManagement();
+  await loadBranchesForUserForm();
+}
+
+async function deleteBranch(id,name){
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  if(!confirm(`${name} şubesi silinsin mi? Şubeye bağlı kullanıcı/stok kayıtları varsa silme işlemi gerçekleşmez.`))return;
+  const {error}=await supabaseClient.from('branches').delete().eq('id',id);
+  if(error){toast('Şube silinemedi. Bağlı kullanıcı veya stok kayıtları olabilir.');return;}
+  if(selectedBranchId===id){selectedBranchId=null;sessionStorage.removeItem('barskt_selected_branch');}
+  toast(`${name} silindi.`);
+  await loadBranchManagement();
+  await loadBranchesForUserForm();
+}
+
+$('addBranchBtn')?.addEventListener('click',addBranch);
+$('refreshBranches')?.addEventListener('click',loadBranchManagement);
+$('newBranchName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addBranch()});
+
+function roleLabel(role){return role==='admin'?'👑 Admin':role==='yönetici'?'🧑‍💼 Yönetici':'👤 Kullanıcı'}
+function updateUserRoleForm(){
+  const role=$('newUserRole')?.value||'kullanıcı';
+  const sel=$('newUserBranch'),note=$('newUserRoleNote');
+  const needsBranch=role==='kullanıcı';
+  if(sel){sel.disabled=!needsBranch;sel.required=needsBranch;if(!needsBranch)sel.value='';}
+  if(note)note.textContent=role==='kullanıcı'?'Kullanıcı yalnızca seçilen şubeye erişir.':role==='yönetici'?'Yönetici tüm şubeleri görebilir ve şube değiştirebilir.':'Admin tüm şubeleri ve sistem yönetimini görebilir.';
+}
+
+async function loadBranchesForUserForm(){
+  const sel=$('newUserBranch');
+  if(!sel || currentProfile?.role!=='admin')return;
+  if(!branchesCache.length){
+    const {data,error}=await supabaseClient.from('branches').select('id,name,is_active').order('name');
+    if(error){sel.innerHTML='<option value="">Şubeler yüklenemedi</option>';toast('Şubeler yüklenemedi.');return;}
+    branchesCache=data||[];
+  }
+  sel.innerHTML='<option value="">Şube seç...</option>'+branchesCache.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  updateUserRoleForm();
+}
+
+async function loadUsers(){
+  if(currentProfile?.role!=='admin')return;
+  const list=$('usersList'),stats=$('userStats');
+  if(!list)return;
+  list.innerHTML='<div class="empty">Kullanıcılar yükleniyor...</div>';
+  const {data,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id,is_active,created_at').order('created_at',{ascending:false});
+  if(error){list.innerHTML='<div class="empty">Kullanıcılar okunamadı.</div>';toast('Kullanıcı listesi yüklenemedi.');return;}
+  const users=data||[];
+  const counts={admin:0,yönetici:0,kullanıcı:0};users.forEach(u=>{if(counts[u.role]!=null)counts[u.role]++});
+  if(stats)stats.innerHTML=`<div class="userStat"><b>${users.length}</b><span>Toplam kullanıcı</span></div><div class="userStat"><b>${counts.admin}</b><span>Admin</span></div><div class="userStat"><b>${counts.yönetici}</b><span>Yönetici</span></div><div class="userStat"><b>${counts.kullanıcı}</b><span>Kullanıcı</span></div>`;
+  const branchName=id=>branchesCache.find(b=>b.id===id)?.name||'Şube yok / tüm şubeler';
+  list.innerHTML=users.map(u=>{
+    const safeId=jsarg(u.id);
+    const branch=u.role==='kullanıcı'?branchName(u.branch_id):'Tüm şubeler';
+    const status=u.is_active?'Aktif':'Pasif';
+    return `<div class="userRow"><div class="row"><div><b>${esc(u.full_name)}</b><div class="meta">Giriş adı: <b>${esc(u.username||'-')}</b> · ${esc(branch)}</div></div><span class="roleBadge">${roleLabel(u.role)}</span></div><div class="meta">Durum: ${status}</div><div class="userActions"><button class="secondary" onclick='editUser(${safeId})'>✏️ Düzenle</button><button class="secondary" onclick='resetUserPassword(${safeId})'>🔑 Şifre değiştir</button>${u.id!==currentProfile?.id?`<button class="secondary dangerBtn" onclick='deleteUser(${safeId},${jsarg(u.full_name)})'>🗑️ Sil</button>`:''}</div></div>`;
+  }).join('')||'<div class="empty">Henüz kullanıcı yok.</div>';
+}
+
+async function adminAction(payload){
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session?.access_token)throw new Error('Oturum bulunamadı.');
+  const response=await fetch(`${SUPABASE_URL}/functions/v1/Create-user`,{method:'POST',headers:{'Authorization':`Bearer ${session.access_token}`,'apikey':SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  let result=null;try{result=await response.json()}catch(_){}
+  if(!response.ok||!result?.success)throw new Error(result?.error||result?.message||`Sunucu hatası (${response.status})`);
+  return result;
+}
+
+async function createUserFromAdmin(e){
+  e.preventDefault();
+  if(currentProfile?.role!=='admin')return toast('Bu işlem için Admin yetkisi gerekiyor.');
+  const fullName=$('newUserFullName').value.trim(),username=$('newUserUsername').value.trim().toLowerCase(),password=$('newUserPassword').value,role=$('newUserRole').value,branchId=$('newUserBranch').value;
+  if(!fullName||!username||!password)return toast('Ad soyad, kullanıcı adı ve şifre zorunludur.');
+  if(password.length<6)return toast('Şifre en az 6 karakter olmalıdır.');
+  if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+  const btn=$('createUserBtn'),msg=$('userCreateMsg');btn.disabled=true;btn.style.opacity='.7';msg.textContent='Oluşturuluyor...';
+  try{
+    await adminAction({action:'create',full_name:fullName,username,password,role,branch_id:role==='kullanıcı'?branchId:null});
+    $('createUserForm').reset();$('newUserRole').value='kullanıcı';$('newUserBranch').value='';updateUserRoleForm();msg.textContent='Kullanıcı oluşturuldu ✓';toast(`${fullName} · ${roleLabel(role)} oluşturuldu.`);await loadUsers();
+  }catch(err){msg.textContent='';toast(err?.message||'Kullanıcı oluşturulamadı.')}finally{btn.disabled=false;btn.style.opacity='1'}
+}
+
+async function editUser(id){
+  const {data:u,error}=await supabaseClient.from('profiles').select('id,full_name,username,role,branch_id').eq('id',id).single();
+  if(error||!u)return toast('Kullanıcı bulunamadı.');
+
+  const activeBranches=branchesCache.filter(b=>b.is_active);
+  const modal=document.createElement('div');
+  modal.id='editUserModal';
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+  const branchOptions=activeBranches.map(b=>`<option value="${esc(b.id)}" ${b.id===u.branch_id?'selected':''}>${esc(b.name)}</option>`).join('');
+  const roleOptions=`<option value="kullanıcı" ${u.role==='kullanıcı'?'selected':''}>👤 Kullanıcı</option><option value="yönetici" ${u.role==='yönetici'?'selected':''}>🧑‍💼 Yönetici</option><option value="admin" ${u.role==='admin'?'selected':''}>👑 Admin</option>`;
+  modal.innerHTML=`<div style="width:100%;max-width:460px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 15px 40px #0005;max-height:90vh;overflow:auto">
+    <div class="row" style="margin-bottom:16px"><h3 style="margin:0">✏️ Kullanıcı Düzenle</h3><button type="button" class="icon" id="editUserClose">✕</button></div>
+    <label>Ad Soyad<input id="editUserFullName" value="${esc(u.full_name||'')}" placeholder="Örn. Ahmet Yılmaz"></label>
+    <label>Kullanıcı adı<input id="editUserUsername" value="${esc(u.username||'')}" placeholder="Örn. ahmet" autocapitalize="none" autocomplete="off"></label>
+    <label>Rol<select id="editUserRole">${roleOptions}</select></label>
+    <label>Şube<select id="editUserBranch"><option value="">Şube seç...</option>${branchOptions}</select></label>
+    <div id="editUserRoleNote" class="productSelectNote"></div>
+    <div class="actions" style="justify-content:flex-end;margin-top:16px"><button type="button" class="secondary" id="editUserCancel">Vazgeç</button><button type="button" id="editUserSave">💾 Kaydet</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  const roleSel=modal.querySelector('#editUserRole');
+  const branchSel=modal.querySelector('#editUserBranch');
+  const note=modal.querySelector('#editUserRoleNote');
+  const syncRole=()=>{
+    const role=roleSel.value;
+    const isUser=role==='kullanıcı';
+    branchSel.disabled=!isUser;
+    if(!isUser){branchSel.value='';note.textContent='Bu roldeki kullanıcı tüm şubelere erişebilir.';}
+    else {note.textContent='Kullanıcı yalnızca seçilen şubeye erişir.';}
+  };
+  roleSel.addEventListener('change',syncRole);
+  syncRole();
+
+  const close=()=>modal.remove();
+  modal.querySelector('#editUserClose').onclick=close;
+  modal.querySelector('#editUserCancel').onclick=close;
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+
+  modal.querySelector('#editUserSave').onclick=async()=>{
+    const full=modal.querySelector('#editUserFullName').value.trim();
+    const username=modal.querySelector('#editUserUsername').value.trim().toLowerCase();
+    const role=roleSel.value;
+    const branchId=role==='kullanıcı'?branchSel.value:null;
+    if(!full||!username)return toast('Ad soyad ve kullanıcı adı boş olamaz.');
+    if(role==='kullanıcı'&&!branchId)return toast('Kullanıcı için şube seçmelisin.');
+    const saveBtn=modal.querySelector('#editUserSave');
+    saveBtn.disabled=true;saveBtn.style.opacity='.7';
+    try{
+      await adminAction({action:'update',user_id:id,full_name:full,username,role,branch_id:branchId});
+      close();toast('Kullanıcı bilgileri güncellendi.');await loadUsers();
+    }catch(err){toast(err?.message||'Kullanıcı güncellenemedi.');saveBtn.disabled=false;saveBtn.style.opacity='1'}
+  };
+}
+
+async function resetUserPassword(id){
+  const p=prompt('Yeni şifre (en az 6 karakter):','');if(p===null)return;if(p.length<6)return toast('Şifre en az 6 karakter olmalı.');
+  try{await adminAction({action:'reset_password',user_id:id,password:p});toast('Şifre değiştirildi.');}catch(err){toast(err?.message||'Şifre değiştirilemedi.')}
+}
+
+async function deleteUser(id,name){
+  if(!confirm(`${name} kullanıcısı tamamen silinsin mi? Bu işlem giriş hesabını ve profilini kaldırır.`))return;
+  try{await adminAction({action:'delete',user_id:id});toast(`${name} silindi.`);await loadUsers();}catch(err){toast(err?.message||'Kullanıcı silinemedi.')}
+}
+
+$('newUserRole')?.addEventListener('change',updateUserRoleForm);
+$('refreshUsers')?.addEventListener('click',loadUsers);
+
+function openExpiryRange(min,max,title){expiryRange={min,max,title};show('products');renderProducts()}
+$('statAll').onclick=()=>{expiryRange=null;show('products');renderProducts()};
+$('stat30').onclick=()=>openExpiryRange(16,30,'SKT 30-16 gün kalan ürünler');
+$('stat15').onclick=()=>openExpiryRange(6,15,'SKT 15-6 gün kalan ürünler');
+$('stat5').onclick=()=>openExpiryRange(0,5,'SKT 5 gün ve daha az kalan ürünler');
+async function adjust(id,n){
+  const p=db.products.find(x=>x.id===id); if(!p)return;
+  const next=Math.max(0,Number(p.qty)+n);
+  const {error}=await supabaseClient.from('stock_records').update({quantity:next,updated_at:new Date().toISOString()}).eq('id',id).eq('branch_id',selectedBranchId);
+  if(error){toast(error.message||'Miktar güncellenemedi.');return;}
+  await writeAudit({branchId:selectedBranchId,productId:p.product_id,action:n>0?'STOK_ARTIR':'STOK_AZALT',fieldName:'quantity',oldValue:p.qty,newValue:next});
+  await syncStockFromSupabase();
+}
+async function delStock(id){
+  const p=db.products.find(x=>x.id===id);if(!p)return;
+  if(!confirm('Bu stok kaydını silmek istiyor musun?'))return;
+  const {error}=await supabaseClient.from('stock_records').delete().eq('id',id).eq('branch_id',selectedBranchId);
+  if(error){toast(error.message||'Stok kaydı silinemedi.');return;}
+  await writeAudit({branchId:selectedBranchId,productId:p.product_id,action:'STOK_SIL',fieldName:'stock_record',oldValue:`${p.qty} ${p.unit} · SKT ${p.expiry}`,newValue:null});
+  await syncStockFromSupabase();
+  toast('Stok kaydı silindi.');
+}
+function editStock(id){
+  let p=db.products.find(x=>x.id===id);if(!p)return;
+  db.editId=id;
+  $('category').value=p.category;renderProductTemplate();$('productTemplate').value=p.name;
+  $('expiry').value=p.expiry;$('qty').value=p.qty;$('unit').value=p.unit;$('barcode').value=p.barcode||'';$('note').value=p.note||'';
+  $('formTitle').textContent='Stok kaydını düzenle';$('save').textContent='Değişiklikleri kaydet';$('cancelEdit').classList.remove('hidden');show('add')
+}
+function resetForm(){db.editId=null;$('formTitle').textContent='Yeni stok kaydı';$('save').textContent='Kaydet';$('cancelEdit').classList.add('hidden');$('expiry').value='';$('qty').value=1;$('barcode').value='';$('note').value='';$('productTemplate').value=''}
+$('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange=autoFillBarcode;$('filter').onchange=renderProducts;$('search').oninput=renderProducts;
+$('save').onclick=async()=>{
+  const branchId=selectedBranchId||currentProfile?.branch_id;
+  if(!branchId)return toast('Önce aktif şube seçilmeli.');
+  let cat=$('category').value,name=$('productTemplate').value,exp=$('expiry').value;
+  if(!cat||!name||!exp)return toast('Kategori, ürün ve SKT gerekli');
+  let productId;
+  try{productId=await resolveRemoteProductId(cat,name)}catch(err){toast(err?.message||'Ürün Supabase üzerinde bulunamadı.');return;}
+  const qty=Math.max(0,Number($('qty').value)||0),unit=$('unit').value,note=$('note').value.trim();
+  const code=$('barcode').value.trim();
+  const editingId=db.editId;
+  if(editingId){
+    const old=db.products.find(x=>x.id===editingId);
+    const payload={product_id:productId,expiry_date:exp,quantity:qty,unit,updated_at:new Date().toISOString(),note};
+    const {error}=await supabaseClient.from('stock_records').update(payload).eq('id',editingId).eq('branch_id',branchId);
+    if(error){toast(error.message||'Stok kaydı güncellenemedi.');return;}
+    if(old){
+      if(old.quantity!==undefined) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'quantity',oldValue:old.qty,newValue:qty});
+      if(old.expiry!==exp) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'expiry_date',oldValue:old.expiry,newValue:exp});
+      if(old.product_id!==productId) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'product_id',oldValue:old.product_id,newValue:productId});
+      if(old.unit!==unit) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'unit',oldValue:old.unit,newValue:unit});
+    }
+    resetForm();await syncStockFromSupabase();show('products');toast(code?'Stok kaydı güncellendi · barkod ürün kataloğunda':'Stok kaydı güncellendi');return;
+  }
+  const payload={branch_id:branchId,product_id:productId,expiry_date:exp,quantity:qty,unit,created_by:currentProfile?.id||null,note};
+  let {data,error}=await supabaseClient.from('stock_records').insert(payload).select('id').single();
+  if(error && error.code==='23505'){
+    const existing=db.products.find(x=>x.product_id===productId&&x.expiry===exp);
+    if(existing){
+      const newQty=Number(existing.qty)+qty;
+      const upd=await supabaseClient.from('stock_records').update({quantity:newQty,updated_at:new Date().toISOString(),unit,note}).eq('id',existing.id).eq('branch_id',branchId);
+      if(upd.error){toast(upd.error.message||'Mevcut stok güncellenemedi.');return;}
+      await writeAudit({branchId,productId,action:'STOK_BIRLESTIR',fieldName:'quantity',oldValue:existing.qty,newValue:newQty});
+      resetForm();await syncStockFromSupabase();show('products');toast('Aynı ürün ve SKT zaten vardı; miktar üzerine eklendi.');return;
+    }
+  }
+  if(error){toast(error.message||'Stok kaydı eklenemedi.');return;}
+  await writeAudit({branchId,productId,action:'STOK_EKLE',fieldName:'quantity',oldValue:null,newValue:qty});
+  if(code)db.barcodeMap[code]={category:cat,name};
+  localStorage.setItem(KEY,JSON.stringify(db));resetForm();await syncStockFromSupabase();show('products');toast(code?'Stok kaydı eklendi · barkod ürünle eşleştirildi':'Stok kaydı eklendi');
+}
+$('cancelEdit').onclick=()=>{resetForm();show('products')};
+$('newCategoryInline').onclick=()=>{addCat()};$('newProductInline').onclick=()=>{let c=$('category').value;if(c)addCatalogProduct(c);else toast('Önce kategori seç')};$('addCat').onclick=addCat;
+$('createUserForm')?.addEventListener('submit',createUserFromAdmin);
+function openCategoryModal(mode,c){
+  let old=document.getElementById('categoryModal'); if(old)old.remove();
+  const isEdit=mode==='edit'; const currentIcon=isEdit?catIcon(c):'📦';
+  const modal=document.createElement('div'); modal.id='categoryModal';
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="width:100%;max-width:430px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 15px 40px #0005;max-height:90vh;overflow:auto">
+    <div style="font-size:19px;font-weight:800;margin-bottom:6px">${isEdit?'Kategori düzenle':'Yeni kategori'}</div>
+    <div style="font-size:13px;color:#68756e;margin-bottom:10px">Kategoriye uygun bir simge seçebilirsin.</div>
+    <div style="display:flex;gap:10px;align-items:center;background:#f7faf8;border-radius:12px;padding:10px;margin-bottom:10px"><span id="catIconPreview" class="catIconPreview">${currentIcon}</span><input id="categoryNameInput" type="text" value="${isEdit?esc(c):''}" placeholder="Kategori adı" autocomplete="off" style="margin-top:0;flex:1"></div>
+    <div class="iconGrid">${iconChoices.map((i,idx)=>`<button type="button" class="emojiBtn ${i===currentIcon?'selected':''}" data-icon-index="${idx}">${i}</button>`).join('')}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button type="button" class="secondary" id="categoryCancel">Vazgeç</button><button type="button" class="primary" id="categorySave">${isEdit?'Kaydet':'Kategori oluştur'}</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  const input=document.getElementById('categoryNameInput'), preview=document.getElementById('catIconPreview'); let selected=currentIcon;
+  modal.querySelectorAll('.emojiBtn').forEach(btn=>btn.onclick=()=>{selected=iconChoices[Number(btn.dataset.iconIndex)];modal.querySelectorAll('.emojiBtn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');preview.textContent=selected});
+  const close=()=>modal.remove(); document.getElementById('categoryCancel').onclick=close;
+  document.getElementById('categorySave').onclick=async()=>{
+    if(!adminOnlyCatalog())return;
+    let n=(input.value||'').trim(); if(!n)return toast('Kategori adı gerekli');
+    if(!isEdit){
+      if(db.categories.includes(n))return toast('Bu kategori zaten var');
+      try{
+        const cat=await createRemoteCategory(n,selected);
+        db.categories.push(cat.name); db.catalog[cat.name]=[]; db.categoryIcons[cat.name]=cat.icon||selected;
+        db.remoteCategoryIds[cat.name]=cat.id;
+        save(); $('category').value=cat.name; renderProductTemplate(); close(); toast("Kategori Supabase'e kaydedildi");
+      }catch(err){toast(err?.message||'Kategori oluşturulamadı.');}
+    }else{
+      if(n!==c && db.categories.includes(n))return toast('Bu kategori zaten var');
+      try{
+        await updateRemoteCategory(c,n,selected);
+        let i=db.categories.indexOf(c); if(i<0)return close(); db.categories[i]=n; db.catalog[n]=db.catalog[c]||[]; delete db.catalog[c];
+        db.products.forEach(p=>{if(p.category===c)p.category=n});
+        const cid=db.remoteCategoryIds[c]; delete db.remoteCategoryIds[c]; db.remoteCategoryIds[n]=cid;
+        Object.keys(db.remoteProductIds||{}).forEach(k=>{if(k.startsWith(c+'|||')){const id=db.remoteProductIds[k];const oldName=k.slice((c+'|||').length);delete db.remoteProductIds[k];db.remoteProductIds[n+'|||'+oldName]=id}});
+        if(db.categoryIcons[c]){db.categoryIcons[n]=selected;delete db.categoryIcons[c]}else db.categoryIcons[n]=selected;
+        Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=n});
+        save(); close(); toast('Kategori Supabase üzerinde güncellendi');
+      }catch(err){toast(err?.message||'Kategori güncellenemedi.');}
+    }
+  };
+  modal.addEventListener('click',e=>{if(e.target===modal)close()}); setTimeout(()=>input.focus(),50);
+}
+function addCat(){openCategoryModal('add')}
+function renameCat(c){openCategoryModal('edit',c)}
+function deleteCat(c){if(db.categories.length<=1)return toast('En az bir kategori kalmalı');let count=db.products.filter(p=>p.category===c).length;if(count&&!confirm(`Bu kategoride ${count} stok kaydı var. Kategoriyi silersen stok kayıtları başka bir kategoriye taşınacak. Devam?`))return;let target=db.categories.find(x=>x!==c);db.products.forEach(p=>{if(p.category===c)p.category=target});Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=target});delete db.catalog[c];delete db.categoryIcons[c];db.categories=db.categories.filter(x=>x!==c);save();toast('Kategori silindi')}
+function addCatalogProduct(c){
+  if(!db.categories.includes(c))return toast('Kategori bulunamadı');
+  let old=document.getElementById('catalogProductModal'); if(old)old.remove();
+  const modal=document.createElement('div'); modal.id='catalogProductModal';
+  modal.style.cssText='position:fixed;inset:0;background:#0007;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="width:100%;max-width:430px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 15px 40px #0005">
+    <div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(c)} kategorisine ürün ekle</div>
+    <div style="font-size:13px;color:#68756e;margin-bottom:12px">Bu ürün daha sonra Ürün Ekle ekranındaki ürün listesinde görünecek.</div>
+    <input id="catalogProductName" type="text" placeholder="Ürün adı" autocomplete="off" style="width:100%;padding:13px;border:1px solid #d9e0dc;border-radius:11px;font-size:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button type="button" class="secondary" id="catalogProductCancel">Vazgeç</button>
+      <button type="button" class="primary" id="catalogProductSave">Ürünü ekle</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  const input=document.getElementById('catalogProductName');
+  const close=()=>{modal.remove()};
+  document.getElementById('catalogProductCancel').onclick=close;
+  document.getElementById('catalogProductSave').onclick=async()=>{
+    if(!adminOnlyCatalog())return;
+    let n=(input.value||'').trim();
+    if(!n)return toast('Ürün adı gerekli');
+    if(!db.catalog[c])db.catalog[c]=[];
+    if(db.catalog[c].some(x=>x.toLowerCase()===n.toLowerCase()))return toast('Bu ürün zaten tanımlı');
+    try{
+      const p=await createRemoteProduct(c,n);
+      db.catalog[c].push(p.name); db.remoteProductIds[`${c}|||${p.name}`]=p.id;
+      save(); $('category').value=c; renderProductTemplate(); $('productTemplate').value=n; close(); toast(`${n} ürünü Supabase'e kaydedildi`);
+    }catch(err){toast(err?.message||'Ürün oluşturulamadı.');}
+  };
+  modal.addEventListener('click',e=>{if(e.target===modal)close()});
+  setTimeout(()=>input.focus(),50);
+}
+async function renameProduct(c,p){
+  if(!adminOnlyCatalog())return;
+  let n=prompt('Ürün adı:',p);if(!n||!(n=n.trim())||n===p)return;
+  let arr=db.catalog[c]||[];if(arr.includes(n))return toast('Bu ürün zaten var');
+  try{
+    await updateRemoteProduct(c,p,n);
+    arr[arr.indexOf(p)]=n;
+    db.products.forEach(x=>{if(x.category===c&&x.name===p)x.name=n});
+    const pid=db.remoteProductIds?.[`${c}|||${p}`];delete db.remoteProductIds[`${c}|||${p}`];db.remoteProductIds[`${c}|||${n}`]=pid;
+    Object.entries(db.barcodeMap||{}).forEach(([code,v])=>{if(v&&v.category===c&&v.name===p)v.name=n});
+    save();toast('Ürün adı Supabase üzerinde güncellendi');
+  }catch(err){toast(err?.message||'Ürün güncellenemedi.');}
+}
+async function moveCatalogProduct(c,p){
+  if(!adminOnlyCatalog())return;
+  let targets=db.categories.filter(x=>x!==c);if(!targets.length)return toast('Taşınabilecek başka kategori yok');
+  let list=targets.map((x,i)=>`${i+1}. ${x}`).join('\n');let answer=prompt(`"${p}" ürününü hangi kategoriye taşımak istiyorsun?\n\n${list}\n\nKategori numarasını veya adını yaz:`);if(answer===null)return;answer=answer.trim();if(!answer)return;
+  let target=targets.find(x=>x.toLowerCase()===answer.toLowerCase());if(!target&&/^\d+$/.test(answer)){let i=Number(answer)-1;if(i>=0&&i<targets.length)target=targets[i]}
+  if(!target)return toast('Geçerli bir kategori seçilmedi');if((db.catalog[target]||[]).some(x=>x.toLowerCase()===p.toLowerCase()))return toast(`"${p}" zaten ${target} kategorisinde`);
+  try{
+    await moveRemoteProduct(c,p,target);
+    db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);if(!db.catalog[target])db.catalog[target]=[];db.catalog[target].push(p);
+    let moved=db.products.filter(x=>x.category===c&&x.name===p);moved.forEach(x=>x.category=target);
+    const pid=db.remoteProductIds?.[`${c}|||${p}`];delete db.remoteProductIds[`${c}|||${p}`];db.remoteProductIds[`${target}|||${p}`]=pid;
+    Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c&&v.name===p)v.category=target});
+    save();toast(`${p} ürünü ${target} kategorisine taşındı. ${moved.length} stok kaydı korundu.`);
+  }catch(err){toast(err?.message||'Ürün taşınamadı.');}
+}
+async function deleteCatalogProduct(c,p){
+  if(!adminOnlyCatalog())return;
+  let used=db.products.filter(x=>x.category===c&&x.name===p).length;if(used&&!confirm(`Bu ürün ${used} stok kaydında kullanılıyor. Tanımdan pasif hale getirilsin mi? Mevcut stok kayıtları korunacak.`))return;
+  if(!confirm(`"${p}" ürün tanımından kaldırılacak. Devam edilsin mi?`))return;
+  try{
+    await softDeleteRemoteProduct(c,p);
+    db.catalog[c]=(db.catalog[c]||[]).filter(x=>x!==p);
+    delete db.remoteProductIds[`${c}|||${p}`];
+    Object.keys(db.barcodeMap||{}).forEach(code=>{let v=db.barcodeMap[code];if(v&&v.category===c&&v.name===p)delete db.barcodeMap[code]});
+    save();toast('Ürün katalogdan kaldırıldı. Mevcut stok kayıtları korunuyor.');
+  }catch(err){toast(err?.message||'Ürün kaldırılamadı.');}
+}
+async function deleteCat(c){
+  if(!adminOnlyCatalog())return;
+  if(db.categories.length<=1)return toast('En az bir kategori kalmalı');
+  const target=db.categories.find(x=>x!==c);const count=(db.catalog[c]||[]).length;
+  if(!confirm(`${c} kategorisi pasif hale getirilecek. İçindeki ${count} ürün ${target} kategorisine taşınacak. Mevcut stok kayıtları korunacak. Devam?`))return;
+  try{
+    const sourceProducts=[...(db.catalog[c]||[])];
+    for(const p of sourceProducts) await moveRemoteProduct(c,p,target);
+    await softDeleteRemoteCategory(c);
+    db.products.forEach(x=>{if(x.category===c)x.category=target});
+    sourceProducts.forEach(p=>{
+      if(!db.catalog[target])db.catalog[target]=[];
+      if(!db.catalog[target].includes(p))db.catalog[target].push(p);
+      const pid=db.remoteProductIds?.[`${c}|||${p}`];delete db.remoteProductIds[`${c}|||${p}`];db.remoteProductIds[`${target}|||${p}`]=pid;
+    });
+    Object.values(db.barcodeMap||{}).forEach(v=>{if(v&&v.category===c)v.category=target});
+    delete db.catalog[c];delete db.categoryIcons[c];delete db.remoteCategoryIds[c];db.categories=db.categories.filter(x=>x!==c);
+    save();toast(`${c} kategorisi pasif yapıldı, ürünler ${target} kategorisine taşındı.`);
+  }catch(err){toast(err?.message||'Kategori kaldırılamadı. Hiçbir yerel değişiklik tamamlanmadan bırakıldı.');}
+}
+$('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download='barskt-yedek.json';a.click()};$('clear').onclick=()=>{if(confirm('Tüm stok ve tanımlı kategori/ürün verileri silinecek. Emin misin?')){localStorage.removeItem(KEY);location.reload()}};
+let reader=null,controls=null;
+let zxingPromise=null;
+function loadZXing(){
+  if(window.ZXingBrowser) return Promise.resolve();
+  if(zxingPromise) return zxingPromise;
+  zxingPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement("script"); s.src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"; s.async=true;
+    s.onload=()=>resolve(); s.onerror=()=>reject(new Error("ZXing yüklenemedi")); document.head.appendChild(s);
+  });
+  return zxingPromise;
+}
+
+async function stopScanner(){try{controls?.stop()}catch(e){}controls=null;try{reader?.reset()}catch(e){}reader=null;let v=$('barcodeVideo');try{v.srcObject?.getTracks().forEach(t=>t.stop());v.srcObject=null}catch(e){}$('scannerBox').classList.add('hidden')}
+async function startScanner(){
+  $('scannerBox').classList.remove('hidden');
+  try{
+    if('BarcodeDetector' in window){
+      const supported=await BarcodeDetector.getSupportedFormats().catch(()=>[]);
+      const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','code_39'].filter(x=>!supported.length||supported.includes(x));
+      const detector=new BarcodeDetector({formats:wanted.length?wanted:undefined});
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
+      const v=$('barcodeVideo'); v.srcObject=stream; await v.play();
+      let stopped=false; const scan=async()=>{if(stopped)return; try{const codes=await detector.detect(v); if(codes.length){const code=codes[0].rawValue; $('barcode').value=code; stopped=true; await stopScanner(); await lookup(code); return;}}catch(e){} requestAnimationFrame(scan)}; scan();
+      return;
+    }
+    await loadZXing();
+    if(!window.ZXingBrowser) throw new Error('Barkod modülü yüklenemedi');
+    reader=new ZXingBrowser.BrowserMultiFormatReader();
+    let devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    let back=devices.find(d=>/back|rear|environment|ark/i.test(d.label))||devices[devices.length-1];
+    controls=await reader.decodeFromVideoDevice(back?.deviceId,$('barcodeVideo'),async r=>{if(r){let code=r.getText();$('barcode').value=code;await stopScanner();await lookup(code)}});
+  }catch(e){await stopScanner();toast('Kamera açılamadı. Safari Ayarlar > Kamera iznini kontrol et veya barkodu elle gir.')}}
+async function lookup(code){code=String(code||'').trim();if(!code)return;
+  // Önce restoranın kendi kaydettiği barkod hafızasına bak.
+  const local=db.barcodeMap?.[code];
+  if(local && db.categories.includes(local.category) && (db.catalog[local.category]||[]).includes(local.name)){
+    $('category').value=local.category; renderProductTemplate(); $('productTemplate').value=local.name; $('barcode').value=code; toast('Kayıtlı ürün bulundu: '+local.name); return;
+  }
+  toast('Barkod okunuyor...');
+  try{let r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');let j=await r.json();
+    if(j.status===1&&j.product){let p=j.product;let name=p.product_name_tr||p.product_name||p.generic_name_tr||p.generic_name;let cat=findCat(p);
+      if(name&&cat&&db.categories.includes(cat)){
+        $('category').value=cat; renderProductTemplate(); let arr=db.catalog[cat]||[];let existing=arr.find(x=>x.toLowerCase()===name.toLowerCase());
+        if(existing){$('productTemplate').value=existing;db.barcodeMap[code]={category:cat,name:existing};save();$('barcode').value=code;toast('Tanımlı ürün bulundu: '+existing);}
+        else{ $('productTemplate').value=''; $('barcode').value=code; toast('Barkod okundu. Ürün: '+name+' · Kategori: '+cat+' — Yönetimden ürünü tanımladıktan sonra bu barkod hatırlanacak.'); }
+      }else{ $('barcode').value=code; toast('Barkod okundu; ürün veri tabanında tanınmadı. Ürünü seçip kaydettiğinde bu barkod hatırlanacak.'); }
+    }else{ $('barcode').value=code; toast('Barkod okundu; ürün veri tabanında bulunamadı. Ürünü seçip kaydettiğinde bu barkod hatırlanacak.');}
+  }catch(e){$('barcode').value=code;toast('Barkod okundu; internetten ürün bilgisi alınamadı. Seçtiğin ürünü kaydettiğinde barkod hafızaya alınacak.')}}
+function findCat(p){let c=((p.categories_tags||[]).join(' ')+' '+(p.categories||'')).toLowerCase();if(/beer|bira/.test(c))return'Bira';if(/wine|şarap/.test(c))return'Şarap';if(/vodka/.test(c))return'Vodka';if(/gin/.test(c))return'Gin';if(/whisky|whiskey/.test(c))return'Whisky';if(/rum/.test(c))return'Rum';if(/tequila/.test(c))return'Tequila';if(/liqueur|likör/.test(c))return'Likör';if(/soft-drink|soda|cola|lemonade|meşrubat/.test(c))return'Soft İçecekler';return null}
+$('scanBarcode').onclick=startScanner;$('closeScanner').onclick=stopScanner;$('manualBtn').onclick=()=>{stopScanner();$('barcode').focus()};$('torchBtn').onclick=async()=>{let t=$('barcodeVideo').srcObject?.getVideoTracks?.()[0];try{let c=t?.getCapabilities?.();if(c?.torch)await t.applyConstraints({advanced:[{torch:!(t.getSettings().torch===true)}]});else toast('Bu kamerada ışık kontrolü yok')}catch(e){toast('Işık açılamadı')}};
+initAuth();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script></body></html>
