@@ -190,34 +190,30 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
   <div class="row">
     <div>
       <b>🔔 Bildirim Gönder</b>
-      <div class="muted" style="margin-top:4px">Bildirim hedefini şube ve kullanıcı bazında seç.</div>
+      <div class="muted" style="margin-top:4px">Önce şubeyi, sonra bir veya birden fazla alıcıyı seç.</div>
     </div>
   </div>
 
-  <label>Gönderim hedefi</label>
-  <select id="notifTargetType">
+  <label># Şubeler</label>
+  <select id="notifBranch">
     <option value="all">🌐 Tüm şubeler</option>
-    <option value="branch">🏢 Belirli bir şube</option>
-    <option value="user">👤 Belirli bir kullanıcı</option>
   </select>
 
-  <div id="notifBranchWrap" class="hidden">
-    <label>Şube</label>
-    <select id="notifBranch"></select>
+  <label style="margin-top:14px"># Alıcılar</label>
+  <div id="notifRecipients" style="border:1px solid #d9e0dc;border-radius:12px;background:#fff;overflow:hidden"></div>
+
+  <div class="actions" style="margin-top:10px">
+    <button class="secondary" type="button" id="notifSelectAll">☑️ Tümünü Seç</button>
+    <button class="secondary" type="button" id="notifClearAll">☐ Seçimleri Temizle</button>
   </div>
 
-  <div id="notifUserWrap" class="hidden">
-    <label>Kullanıcı</label>
-    <select id="notifUser"></select>
-  </div>
-
-  <label>Bildirim başlığı</label>
+  <label style="margin-top:14px">Bildirim başlığı</label>
   <input id="notifTitle" type="text" placeholder="Örn: SKT Uyarısı">
 
   <label>Bildirim mesajı</label>
-  <textarea id="notifBody" rows="4" placeholder="Örn: Budweiser ürünlerinin SKT kontrolünü yapınız." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px;resize:vertical"></textarea>
+  <textarea id="notifBody" rows="4" placeholder="Örn: SKT kontrolü yapılmalıdır." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px;resize:vertical"></textarea>
 
-  <div id="notifTargetSummary" class="productSelectNote" style="margin-top:10px">Hedef: Tüm şubeler</div>
+  <div id="notifTargetSummary" class="productSelectNote" style="margin-top:10px">Şube: Tüm şubeler · Alıcı: 0 kişi</div>
 
   <div class="actions" style="margin-top:10px">
     <button class="secondary" type="button" id="notifPermissionBtn">🔔 Bildirimleri Etkinleştir</button>
@@ -1619,9 +1615,11 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+
 <script id="notification-target-test">
 (function(){
-  function notifEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
   async function initNotificationTargetTest(){
     const card=document.getElementById('notificationAdminCard');
     if(!card) return;
@@ -1630,68 +1628,89 @@ if('serviceWorker' in navigator){
     if(!isAdmin) return;
 
     const branchSel=document.getElementById('notifBranch');
-    const userSel=document.getElementById('notifUser');
-    const typeSel=document.getElementById('notifTargetType');
-    const branchWrap=document.getElementById('notifBranchWrap');
-    const userWrap=document.getElementById('notifUserWrap');
+    const recipientsBox=document.getElementById('notifRecipients');
     const summary=document.getElementById('notifTargetSummary');
     const status=document.getElementById('notifStatus');
 
     const activeBranches=(branchesCache||[]).filter(b=>b.is_active);
-    branchSel.innerHTML='<option value="">Şube seç...</option>'+activeBranches.map(b=>`<option value="${notifEsc(b.id)}">${notifEsc(b.name)}</option>`).join('');
+    branchSel.innerHTML='<option value="all">🌐 Tüm şubeler</option>'+
+      activeBranches.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
 
     let users=[];
     try{
       const r=await supabaseClient.from('profiles')
-        .select('id,full_name,username,branch_id,is_active')
+        .select('id,full_name,username,branch_id,role,is_active')
         .eq('is_active',true)
         .order('full_name');
       if(!r.error) users=r.data||[];
     }catch(e){}
 
-    function refreshUsers(){
-      const bid=branchSel.value;
-      const list=users.filter(u=>!bid || String(u.branch_id)===String(bid));
-      userSel.innerHTML='<option value="">Kullanıcı seç...</option>'+list.map(u=>{
-        const name=u.full_name||u.username||'İsimsiz kullanıcı';
-        const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
-        return `<option value="${notifEsc(u.id)}">${notifEsc(name)}${branch?' · '+notifEsc(branch.name):''}</option>`;
-      }).join('');
+    function roleText(u){
+      const role=String(u.role||'').toLowerCase();
+      return /admin|manager|yönetici/.test(role) ? 'Yönetici' : 'Kullanıcı';
     }
 
-    function updateTargetUI(){
-      const t=typeSel.value;
-      branchWrap.classList.toggle('hidden',t==='all');
-      userWrap.classList.toggle('hidden',t!=='user');
-      if(t==='user') refreshUsers();
+    function selectedIds(){
+      return [...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')]
+        .map(x=>x.dataset.userId);
+    }
 
-      if(t==='all'){
-        summary.textContent='Hedef: Tüm şubeler · aktif kullanıcılar';
-      }else if(t==='branch'){
-        const b=activeBranches.find(x=>String(x.id)===String(branchSel.value));
-        summary.textContent=b?`Hedef: ${b.name} şubesindeki tüm aktif kullanıcılar`:'Hedef: Bir şube seçilmedi';
-      }else{
-        const u=users.find(x=>String(x.id)===String(userSel.value));
-        const b=u&&activeBranches.find(x=>String(x.id)===String(u.branch_id));
-        summary.textContent=u?`Hedef: ${u.full_name||u.username}${b?' · '+b.name:''}`:'Hedef: Bir kullanıcı seçilmedi';
+    function renderRecipients(){
+      const branchId=branchSel.value;
+      const list=branchId==='all'
+        ? users
+        : users.filter(u=>String(u.branch_id)===String(branchId));
+
+      if(!list.length){
+        recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Bu şubede aktif kullanıcı bulunamadı.</div>';
+        updateSummary();
+        return;
       }
+
+      recipientsBox.innerHTML=list.map(u=>{
+        const name=u.full_name||u.username||'İsimsiz kullanıcı';
+        const rt=roleText(u);
+        const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
+        return `<label style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid #edf1ef;cursor:pointer">
+          <input type="checkbox" data-user-id="${esc(u.id)}" data-user-name="${esc(name)}" style="width:19px;height:19px">
+          <span style="flex:1"><b>${esc(name)}</b><br><span class="muted">${esc(rt)}${branchId==='all'&&branch?' · '+esc(branch.name):''}</span></span>
+        </label>`;
+      }).join('');
+
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+        cb.addEventListener('change',updateSummary);
+      });
+      updateSummary();
     }
 
-    typeSel.onchange=updateTargetUI;
-    branchSel.onchange=()=>{ if(typeSel.value==='user') refreshUsers(); updateTargetUI(); };
-    userSel.onchange=updateTargetUI;
-    updateTargetUI();
+    function updateSummary(){
+      const ids=selectedIds();
+      const b=activeBranches.find(x=>String(x.id)===String(branchSel.value));
+      const branchText=branchSel.value==='all'?'Tüm şubeler':(b?.name||'Şube');
+      summary.textContent=`Şube: ${branchText} · Alıcı: ${ids.length} kişi`;
+    }
+
+    branchSel.onchange=renderRecipients;
+
+    document.getElementById('notifSelectAll').onclick=()=>{
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
+      updateSummary();
+    };
+    document.getElementById('notifClearAll').onclick=()=>{
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+      updateSummary();
+    };
 
     document.getElementById('notifPermissionBtn').onclick=async()=>{
       status.textContent='';
       if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
-        status.textContent='Bu sayfa Safari sekmesi olarak açık. iPhone Web Push için uygulamayı Ana Ekran\'a ekleyip oradan açmak gerekiyor.';
+        status.textContent='Bu sayfa Safari sekmesi olarak açık. iPhone Web Push için uygulamayı Ana Ekran’a ekleyip oradan açmak gerekiyor.';
         return;
       }
       try{
         const permission=await Notification.requestPermission();
         status.textContent=permission==='granted'
-          ? 'Bildirim izni verildi. Web Push aboneliği bir sonraki test adımında bağlanacak.'
+          ? 'Bildirim izni verildi. Gerçek gönderim bağlantısı henüz eklenmedi.'
           : 'Bildirim izni verilmedi.';
       }catch(e){status.textContent='Bildirim izni alınamadı: '+(e.message||e);}
     };
@@ -1699,13 +1718,16 @@ if('serviceWorker' in navigator){
     document.getElementById('notifPreviewBtn').onclick=()=>{
       const title=(document.getElementById('notifTitle').value||'').trim();
       const body=(document.getElementById('notifBody').value||'').trim();
+      const ids=selectedIds();
       if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
-      const t=typeSel.value;
-      if(t==='branch' && !branchSel.value){status.textContent='Önce şube seç.';return;}
-      if(t==='user' && !userSel.value){status.textContent='Önce kullanıcı seç.';return;}
-      const target=summary.textContent.replace('Hedef: ','');
-      status.textContent=`Hazır: "${title}" → ${target}. Gerçek gönderim, Web Push sunucu bağlantısı tamamlandıktan sonra yapılacak.`;
+      if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
+      const names=[...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')]
+        .map(x=>x.dataset.userName);
+      const shown=names.slice(0,4).join(', ')+(names.length>4?` ve ${names.length-4} kişi daha`: '');
+      status.textContent=`Hazır: "${title}" → ${shown}. Gerçek gönderim bağlantısı henüz eklenmedi.`;
     };
+
+    renderRecipients();
   }
 
   const oldShowApp=window.showApp;
@@ -1719,5 +1741,6 @@ if('serviceWorker' in navigator){
   document.addEventListener('DOMContentLoaded',()=>setTimeout(initNotificationTargetTest,700));
 })();
 </script>
+
 
 </body></html>
