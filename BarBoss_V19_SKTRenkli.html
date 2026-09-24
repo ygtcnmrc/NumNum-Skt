@@ -811,49 +811,87 @@ async function showProductHistory(stockRecordId,productName,branchId){
   modal.querySelector('#closeAuditHistory').onclick=()=>modal.remove();
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
   const body=modal.querySelector('#auditHistoryBody');
+
   try{
     const effectiveBranch=branchId||selectedBranchId||currentProfile?.branch_id||null;
-    const {data:stockRows,error:stockError}=await supabaseClient.from('stock_records')
-      .select('id,branch_id,product_id,quantity,unit,expiry_date,created_by,created_at,updated_at')
-      .eq('id',stockRecordId).limit(1);
-    if(stockError) throw stockError;
-    const stock=stockRows?.[0]||null;
-    const productId=stock?.product_id||null;
 
-    let q=supabaseClient.from('audit_logs')
+    // Önce ekranda görünen stok kaydını bul. Supabase sorgusu herhangi bir nedenle
+    // boş dönerse, aynı kaydı zaten ekranda tuttuğumuz db.products içinden kullan.
+    let stock=db.products.find(x=>String(x.id)===String(stockRecordId))||null;
+    const {data:stockRows,error:stockError}=await supabaseClient
+      .from('stock_records')
+      .select('id,branch_id,product_id,quantity,unit,expiry_date,created_by,created_at,updated_at')
+      .eq('id',stockRecordId)
+      .maybeSingle();
+    if(stockError) throw stockError;
+    if(stockRows) stock=stockRows;
+
+    const productId=stock?.product_id||null;
+    const stockId=String(stockRecordId);
+
+    // Audit kayıtları stok kaydına field_name içindeki ::stock:<id> etiketiyle
+    // bağlanıyor. Burada doğrudan bu etiketi sorguluyoruz; başka SKT/stok
+    // kayıtlarının hareketleri bu geçmişe kesinlikle dahil edilmiyor.
+    let q=supabaseClient
+      .from('audit_logs')
       .select('id,user_id,branch_id,product_id,action,field_name,old_value,new_value,created_at')
-      .order('created_at',{ascending:false}).limit(500);
+      .ilike('field_name',`%::stock:${stockId}`)
+      .order('created_at',{ascending:false})
+      .limit(500);
     if(effectiveBranch) q=q.eq('branch_id',effectiveBranch);
     if(productId) q=q.eq('product_id',productId);
+
     const {data,error}=await q;
     if(error) throw error;
-    const logs=(data||[]).filter(l=>auditStockMarker(l.field_name)===String(stockRecordId));
+    const logs=data||[];
 
-    const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
-    if(stock?.created_by) ids.push(stock.created_by);
-    const uniqueIds=[...new Set(ids)];
+    // Kullanıcı isimlerini tek sorguda getir.
+    const ids=[...new Set([
+      ...logs.map(x=>x.user_id).filter(Boolean),
+      stock?.created_by
+    ].filter(Boolean))];
     let users=[];
-    if(uniqueIds.length){
-      const r=await supabaseClient.from('profiles').select('id,full_name,username').in('id',uniqueIds);
-      if(!r.error) users=r.data||[];
+    if(ids.length){
+      const r=await supabaseClient
+        .from('profiles')
+        .select('id,full_name,username')
+        .in('id',ids);
+      if(r.error) console.warn('Kullanıcı bilgileri okunamadı:',r.error.message);
+      else users=r.data||[];
     }
     const userMap=Object.fromEntries(users.map(u=>[u.id,u]));
-    const items=[];
-    if(stock?.created_at && !logs.some(l=>l.action==='STOK_EKLE')){
-      items.push({__createdFallback:true,action:'STOK_EKLE',user_id:stock.created_by||null,created_at:stock.created_at,old_value:null,new_value:String(stock.quantity??''),field_name:'quantity'});
+
+    const items=[...logs];
+
+    // Eski ürünlerde audit_logs kaydı bulunmasa bile, stock_records üzerindeki
+    // oluşturulma bilgisi geçmişte gösterilsin.
+    if(stock?.created_at && !items.some(l=>l.action==='STOK_EKLE')){
+      items.push({
+        __createdFallback:true,
+        action:'STOK_EKLE',
+        user_id:stock.created_by||null,
+        created_at:stock.created_at,
+        old_value:null,
+        new_value:String(stock.quantity??''),
+        field_name:'quantity'
+      });
     }
-    items.push(...logs);
+
     items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
     if(!items.length){
       body.innerHTML='<div class="empty">Bu stok kaydı için henüz işlem geçmişi bulunmuyor.</div>';
       return;
     }
+
     body.classList.remove('muted');
     body.innerHTML=items.map(l=>{
       const user=userMap[l.user_id];
       const actionText=l.__createdFallback?'Ürün eklendi':auditActionText(l.action);
+      const field=auditBaseField(l.field_name);
       const change=(l.field_name||l.old_value!=null||l.new_value!=null)
-        ? `<div class="auditHistoryChange"><b>${esc(auditFieldText(l.field_name))}</b>${l.old_value!=null?` · ${esc(l.old_value)}`:''}${l.new_value!=null?` → <b>${esc(l.new_value)}</b>`:''}</div>` : '';
+        ? `<div class="auditHistoryChange"><b>${esc(auditFieldText(field))}</b>${l.old_value!=null?` · ${esc(l.old_value)}`:''}${l.new_value!=null?` → <b>${esc(l.new_value)}</b>`:''}</div>`
+        : '';
       return `<div class="auditHistoryItem">
         <div class="auditHistoryHead"><span class="auditHistoryAction">${esc(actionText)}</span><span class="small">${esc(formatAuditDate(l.created_at))}</span></div>
         <div class="auditHistoryMeta">👤 ${esc(auditUserName(user))}</div>${change}
