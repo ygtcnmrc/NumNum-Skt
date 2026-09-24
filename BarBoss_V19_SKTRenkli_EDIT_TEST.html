@@ -194,12 +194,12 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
     </div>
   </div>
 
-  <label># Şubeler</label>
+  <label>🏢 Şubeler</label>
   <select id="notifBranch">
     <option value="all">🌐 Tüm şubeler</option>
   </select>
 
-  <label style="margin-top:14px"># Alıcılar</label>
+  <label style="margin-top:14px">👥 Alıcılar</label>
   <div id="notifRecipients" style="border:1px solid #d9e0dc;border-radius:12px;background:#fff;overflow:hidden"></div>
 
   <div class="actions" style="margin-top:10px">
@@ -1643,44 +1643,26 @@ if('serviceWorker' in navigator){
         .eq('is_active',true)
         .order('full_name');
       if(!r.error) users=r.data||[];
-    }catch(e){}
+    }catch(e){
+      console.warn('Bildirim alıcıları alınamadı:',e);
+    }
 
-    function roleText(u){
-      const role=String(u.role||'').toLowerCase();
-      return /admin|manager|yönetici/.test(role) ? 'Yönetici' : 'Kullanıcı';
+    function roleKey(u){
+      const role=String(u.role||'').trim().toLowerCase();
+      if(role==='admin' || role.includes('admin')) return 'admin';
+      if(role==='yönetici' || role==='yonetici' || role==='manager' || role.includes('manager')) return 'manager';
+      return 'user';
+    }
+
+    function roleLabel(key){
+      if(key==='admin') return 'Admin';
+      if(key==='manager') return 'Yönetici';
+      return 'Kullanıcı';
     }
 
     function selectedIds(){
       return [...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')]
         .map(x=>x.dataset.userId);
-    }
-
-    function renderRecipients(){
-      const branchId=branchSel.value;
-      const list=branchId==='all'
-        ? users
-        : users.filter(u=>String(u.branch_id)===String(branchId));
-
-      if(!list.length){
-        recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Bu şubede aktif kullanıcı bulunamadı.</div>';
-        updateSummary();
-        return;
-      }
-
-      recipientsBox.innerHTML=list.map(u=>{
-        const name=u.full_name||u.username||'İsimsiz kullanıcı';
-        const rt=roleText(u);
-        const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
-        return `<label style="display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid #edf1ef;cursor:pointer">
-          <input type="checkbox" data-user-id="${esc(u.id)}" data-user-name="${esc(name)}" style="width:19px;height:19px">
-          <span style="flex:1"><b>${esc(name)}</b><br><span class="muted">${esc(rt)}${branchId==='all'&&branch?' · '+esc(branch.name):''}</span></span>
-        </label>`;
-      }).join('');
-
-      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>{
-        cb.addEventListener('change',updateSummary);
-      });
-      updateSummary();
     }
 
     function updateSummary(){
@@ -1690,7 +1672,60 @@ if('serviceWorker' in navigator){
       summary.textContent=`Şube: ${branchText} · Alıcı: ${ids.length} kişi`;
     }
 
-    branchSel.onchange=renderRecipients;
+    function recipientRow(u, branchId){
+      const name=u.full_name||u.username||'İsimsiz kullanıcı';
+      const key=roleKey(u);
+      const rt=roleLabel(key);
+      const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
+      const branchText=branch ? ` · ${branch.name}` : '';
+      const initials=(name.trim().split(/\s+/).map(x=>x[0]).join('').slice(0,2)||'?').toUpperCase();
+      const roleIcon=key==='admin'?'👑':key==='manager'?'🛡️':'👤';
+      return `<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #edf1ef;cursor:pointer">
+        <input type="checkbox" data-user-id="${esc(u.id)}" data-user-name="${esc(name)}" style="width:19px;height:19px">
+        <span style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#eef5f1;font-weight:700;flex:0 0 36px">${esc(initials)}</span>
+        <span style="flex:1"><b>${esc(name)}</b><br><span class="muted">${roleIcon} ${esc(rt)}${branchId==='all'&&branch?` · ${esc(branch.name)}`:branchId!=='all'&&branch?` · ${esc(branch.name)}`:''}</span></span>
+      </label>`;
+    }
+
+    function groupHtml(title, icon, list, branchId){
+      if(!list.length) return '';
+      return `<div style="border-bottom:1px solid #e8eeeb">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f6f9f7;font-weight:700">${icon} ${esc(title)} <span class="muted">(${list.length})</span></div>
+        ${list.map(u=>recipientRow(u,branchId)).join('')}
+      </div>`;
+    }
+
+    function renderRecipients(){
+      const branchId=branchSel.value;
+      // Adminler tüm şubeleri görebildiği için hangi şube seçilirse seçilsin listede kalır.
+      // Kullanıcı ve yöneticiler yalnızca seçilen şubeye aitse listelenir.
+      const list=branchId==='all'
+        ? users
+        : users.filter(u=>roleKey(u)==='admin' || String(u.branch_id)===String(branchId));
+
+      if(!list.length){
+        recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Bu hedef için aktif alıcı bulunamadı.</div>';
+        updateSummary();
+        return;
+      }
+
+      const admins=list.filter(u=>roleKey(u)==='admin');
+      const managers=list.filter(u=>roleKey(u)==='manager');
+      const normalUsers=list.filter(u=>roleKey(u)==='user');
+
+      recipientsBox.innerHTML=
+        groupHtml('Adminler','👑',admins,branchId)+
+        groupHtml('Yöneticiler','🛡️',managers,branchId)+
+        groupHtml('Kullanıcılar','👥',normalUsers,branchId);
+
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',updateSummary));
+      updateSummary();
+    }
+
+    branchSel.onchange=()=>{
+      // Şube değiştiğinde önceki hedef seçimini yanlışlıkla taşımıyoruz.
+      renderRecipients();
+    };
 
     document.getElementById('notifSelectAll').onclick=()=>{
       recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
@@ -1721,8 +1756,7 @@ if('serviceWorker' in navigator){
       const ids=selectedIds();
       if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
       if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
-      const names=[...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')]
-        .map(x=>x.dataset.userName);
+      const names=[...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')].map(x=>x.dataset.userName);
       const shown=names.slice(0,4).join(', ')+(names.length>4?` ve ${names.length-4} kişi daha`: '');
       status.textContent=`Hazır: "${title}" → ${shown}. Gerçek gönderim bağlantısı henüz eklenmedi.`;
     };
