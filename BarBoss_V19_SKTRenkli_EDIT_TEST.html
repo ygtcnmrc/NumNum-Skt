@@ -173,19 +173,6 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
 </section>
 <section id="settings" class="page hidden">
-<div class="card" id="adminDataCard">
-  <div class="row">
-    <div>
-      <b>⚙️ Ayarlar</b>
-      <div class="muted" style="margin-top:4px">Veri yedekleme ve veri yönetimi.</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-    <button class="secondary" id="export">JSON yedekle</button>
-    <button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button>
-  </div>
-</div>
-
 <div class="card" id="notificationAdminCard" style="margin-top:12px">
   <div class="row">
     <div>
@@ -221,6 +208,19 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
   </div>
 
   <div id="notifStatus" class="muted" style="margin-top:10px"></div>
+</div>
+
+<div class="card" id="adminDataCard" style="margin-top:12px">
+  <div class="row">
+    <div>
+      <b>⚙️ Veri Yönetimi</b>
+      <div class="muted" style="margin-top:4px">Veri yedekleme ve veri yönetimi.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+    <button class="secondary" id="export">JSON yedekle</button>
+    <button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button>
+  </div>
 </div>
 
 </section>
@@ -1701,7 +1701,12 @@ if('serviceWorker' in navigator){
       // Kullanıcı ve yöneticiler yalnızca seçilen şubeye aitse listelenir.
       const list=branchId==='all'
         ? users
-        : users.filter(u=>roleKey(u)==='admin' || String(u.branch_id)===String(branchId));
+        : users.filter(u=>{
+            const key=roleKey(u);
+            // Admin ve yöneticiler tüm şubelere erişebildiği için
+            // belirli bir şube seçildiğinde de alıcı listesinde kalırlar.
+            return key==='admin' || key==='manager' || String(u.branch_id)===String(branchId);
+          });
 
       if(!list.length){
         recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Bu hedef için aktif alıcı bulunamadı.</div>';
