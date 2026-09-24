@@ -797,7 +797,7 @@ function auditFieldText(f){
 function auditUserName(u){
   return (u?.full_name||u?.username||'Bilinmeyen kullanıcı').trim();
 }
-async function showProductHistory(stockRecordId,productName,branchId){
+async async function showProductHistory(stockRecordId,productName,branchId){
   const modal=document.createElement('div');
   modal.className='auditHistoryModal';
   modal.innerHTML=`<div class="auditHistoryBox">
@@ -810,41 +810,105 @@ async function showProductHistory(stockRecordId,productName,branchId){
   document.body.appendChild(modal);
   modal.querySelector('#closeAuditHistory').onclick=()=>modal.remove();
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
+
+  const body=modal.querySelector('#auditHistoryBody');
+
   try{
+    const effectiveBranch=branchId||selectedBranchId||currentProfile?.branch_id||null;
+
+    // Önce stok kaydının kendisini alıyoruz. Böylece ürün adı aynı olsa bile
+    // farklı SKT'li stok kayıtları birbirine karışmaz.
+    let stockQuery=supabaseClient.from('stock_records')
+      .select('id,branch_id,product_id,quantity,unit,expiry_date,created_by,created_at,updated_at')
+      .eq('id',stockRecordId)
+      .limit(1);
+    if(effectiveBranch) stockQuery=stockQuery.eq('branch_id',effectiveBranch);
+
+    const {data:stockRows,error:stockError}=await stockQuery;
+    if(stockError) throw stockError;
+
+    const stock=stockRows?.[0]||null;
+    const productId=stock?.product_id||null;
+
+    // Audit kayıtlarını ürün + şube bazında alıp, yalnızca bu stok kaydının
+    // açıkça işaretlenmiş kayıtlarını kullanıyoruz.
     let q=supabaseClient.from('audit_logs')
       .select('id,user_id,branch_id,product_id,action,field_name,old_value,new_value,created_at')
-      .ilike('field_name',`%::stock:${stockRecordId}`)
-      .order('created_at',{ascending:false}).limit(100);
-    if(branchId) q=q.eq('branch_id',branchId);
+      .order('created_at',{ascending:false})
+      .limit(500);
+
+    if(effectiveBranch) q=q.eq('branch_id',effectiveBranch);
+    if(productId) q=q.eq('product_id',productId);
+
     const {data,error}=await q;
     if(error) throw error;
+
     const logs=(data||[]).filter(l=>auditStockMarker(l.field_name)===String(stockRecordId));
+
+    // Audit kaydındaki kullanıcı isimlerini tek seferde getir.
     const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
     let users=[];
     if(ids.length){
       const r=await supabaseClient.from('profiles').select('id,full_name,username').in('id',ids);
       if(!r.error) users=r.data||[];
     }
+
+    // Stok kaydı eskiyse ve ilk STOK_EKLE audit'i eski sistemde işaretlenmemiş
+    // olabilir. Bu durumda stock_records.created_by/created_at bilgisini
+    // "Ürün eklendi" olarak gösteriyoruz.
+    let creator=null;
+    if(stock?.created_by){
+      const r=await supabaseClient.from('profiles')
+        .select('id,full_name,username')
+        .eq('id',stock.created_by)
+        .maybeSingle();
+      if(!r.error) creator=r.data||null;
+    }
+
     const userMap=Object.fromEntries(users.map(u=>[u.id,u]));
-    const body=modal.querySelector('#auditHistoryBody');
-    if(!logs.length){
+    if(creator) userMap[creator.id]=creator;
+
+    const items=[];
+
+    if(stock && stock.created_at){
+      const hasCreateLog=logs.some(l=>l.action==='STOK_EKLE');
+      if(!hasCreateLog){
+        items.push({
+          __createdFallback:true,
+          action:'STOK_EKLE',
+          user_id:stock.created_by||null,
+          created_at:stock.created_at,
+          old_value:null,
+          new_value:String(stock.quantity??''),
+          field_name:'quantity'
+        });
+      }
+    }
+
+    items.push(...logs);
+
+    items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+    if(!items.length){
       body.innerHTML='<div class="empty">Bu stok kaydı için henüz işlem geçmişi bulunmuyor.</div>';
       return;
     }
+
     body.classList.remove('muted');
-    body.innerHTML=logs.map(l=>{
+    body.innerHTML=items.map(l=>{
       const user=userMap[l.user_id];
+      const actionText=l.__createdFallback?'Ürün eklendi':auditActionText(l.action);
       const change=(l.field_name||l.old_value!=null||l.new_value!=null)
         ? `<div class="auditHistoryChange"><b>${esc(auditFieldText(l.field_name))}</b>${l.old_value!=null?` · ${esc(l.old_value)}`:''}${l.new_value!=null?` → <b>${esc(l.new_value)}</b>`:''}</div>`
         : '';
       return `<div class="auditHistoryItem">
-        <div class="auditHistoryHead"><span class="auditHistoryAction">${esc(auditActionText(l.action))}</span><span class="small">${esc(formatAuditDate(l.created_at))}</span></div>
+        <div class="auditHistoryHead"><span class="auditHistoryAction">${esc(actionText)}</span><span class="small">${esc(formatAuditDate(l.created_at))}</span></div>
         <div class="auditHistoryMeta">👤 ${esc(auditUserName(user))}</div>${change}
       </div>`;
     }).join('');
   }catch(err){
     console.error('İşlem geçmişi okunamadı:',err);
-    modal.querySelector('#auditHistoryBody').innerHTML='<div class="empty">İşlem geçmişi okunamadı.</div>';
+    body.innerHTML='<div class="empty">İşlem geçmişi okunamadı.</div>';
   }
 }
 
