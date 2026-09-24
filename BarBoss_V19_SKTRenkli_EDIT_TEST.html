@@ -185,6 +185,48 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
     <button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button>
   </div>
 </div>
+
+<div class="card" id="notificationAdminCard" style="margin-top:12px">
+  <div class="row">
+    <div>
+      <b>🔔 Bildirim Gönder</b>
+      <div class="muted" style="margin-top:4px">Bildirim hedefini şube ve kullanıcı bazında seç.</div>
+    </div>
+  </div>
+
+  <label>Gönderim hedefi</label>
+  <select id="notifTargetType">
+    <option value="all">🌐 Tüm şubeler</option>
+    <option value="branch">🏢 Belirli bir şube</option>
+    <option value="user">👤 Belirli bir kullanıcı</option>
+  </select>
+
+  <div id="notifBranchWrap" class="hidden">
+    <label>Şube</label>
+    <select id="notifBranch"></select>
+  </div>
+
+  <div id="notifUserWrap" class="hidden">
+    <label>Kullanıcı</label>
+    <select id="notifUser"></select>
+  </div>
+
+  <label>Bildirim başlığı</label>
+  <input id="notifTitle" type="text" placeholder="Örn: SKT Uyarısı">
+
+  <label>Bildirim mesajı</label>
+  <textarea id="notifBody" rows="4" placeholder="Örn: Budweiser ürünlerinin SKT kontrolünü yapınız." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px;resize:vertical"></textarea>
+
+  <div id="notifTargetSummary" class="productSelectNote" style="margin-top:10px">Hedef: Tüm şubeler</div>
+
+  <div class="actions" style="margin-top:10px">
+    <button class="secondary" type="button" id="notifPermissionBtn">🔔 Bildirimleri Etkinleştir</button>
+    <button class="primary" type="button" id="notifPreviewBtn">🎯 Hedefi Test Et</button>
+  </div>
+
+  <div id="notifStatus" class="muted" style="margin-top:10px"></div>
+</div>
+
 </section>
 <section id="branchManage" class="page hidden">
 <div class="card hidden" id="branchManagementCard"><div class="row"><div><b>🏢 Şube Yönetimi</b><div class="muted" style="margin-top:4px">Şube ekle, adını değiştir veya aktif/pasif durumunu yönet.</div></div><button class="secondary" id="refreshBranches">↻ Yenile</button></div><div style="display:flex;gap:8px;margin-top:12px"><input id="newBranchName" type="text" placeholder="Yeni şube adı" autocomplete="off" style="margin-top:0;flex:1"><button class="primary" id="addBranchBtn">➕ Ekle</button></div><div id="branchesAdminList" style="margin-top:12px"></div></div>
@@ -913,9 +955,20 @@ async function showProductHistory(stockRecordId,productName,branchId){
     body.innerHTML=`<div class="empty">İşlem geçmişi okunamadı.<br><small>${esc(err?.message||'Supabase bağlantı hatası')}</small></div>`;
   }
 }
-function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="secondary" onclick="showProductHistory('${p.id}',${jsarg(p.name)},'${p.branch_id||selectedBranchId||currentProfile?.branch_id||""}')">🕘 Geçmiş</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
+function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
 function renderSummary(){}
-function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
+function renderProductTemplate(){
+  const sel=$('productTemplate');
+  const current=sel?.value||'';
+  const editProduct=(db.editId ? (db.products.find(x=>String(x.id)===String(db.editId))?.name||'') : '');
+  const wanted=editProduct||current;
+  const c=$('category').value;
+  const arr=[...(db.catalog[c]||[])];
+  if(wanted && !arr.includes(wanted)) arr.unshift(wanted);
+  sel.innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  if(wanted) sel.value=wanted;
+  autoFillBarcode();
+}
 function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
 function jsarg(v){return JSON.stringify(v).replace(/'/g,'&#39;')}
 async function moveCategoryOrder(name,direction){
@@ -1263,29 +1316,63 @@ async function delStock(id){
   toast('Stok kaydı silindi.');
 }
 function editStock(id){
-  let p=db.products.find(x=>x.id===id);if(!p)return;
+  const p=db.products.find(x=>String(x.id)===String(id));
+  if(!p)return;
+
   db.editId=id;
+
+  // Önce düzenleme ekranını açıyoruz. show('add') ürün listesini
+  // yeniden oluşturduğu için mevcut ürün seçimini en son yapmalıyız.
+  show('add');
+
   const category=p.category||'';
   if(category&&!Array.from($('category').options).some(o=>o.value===category)){
-    let opt=document.createElement('option');opt.value=category;opt.textContent=category;$('category').appendChild(opt)
+    const opt=document.createElement('option');
+    opt.value=category;
+    opt.textContent=category;
+    $('category').appendChild(opt);
   }
   $('category').value=category;
+
+  // Kategoriye ait ürünleri doldur.
   renderProductTemplate();
+
+  // Supabase'den gelen kayıt yerel katalogda olmasa bile
+  // mevcut stok kaydındaki ürün mutlaka seçenek olarak gösterilsin.
   const productName=p.name||'';
-  if(productName&&!Array.from($('productTemplate').options).some(o=>o.value===productName)){
-    let opt=document.createElement('option');opt.value=productName;opt.textContent=productName;$('productTemplate').appendChild(opt)
+  if(productName){
+    let option=Array.from($('productTemplate').options).find(o=>o.value===productName);
+    if(!option){
+      option=document.createElement('option');
+      option.value=productName;
+      option.textContent=productName;
+      $('productTemplate').appendChild(option);
+    }
+    $('productTemplate').value=productName;
+  }else{
+    $('productTemplate').value='';
   }
-  $('productTemplate').value=productName;
+
   $('expiry').value=p.expiry||'';
   $('qty').value=p.qty??1;
+
   const unit=p.unit||'Adet';
   if(unit&&!Array.from($('unit').options).some(o=>o.value===unit)){
-    let opt=document.createElement('option');opt.value=unit;opt.textContent=unit;$('unit').appendChild(opt)
+    const opt=document.createElement('option');
+    opt.value=unit;
+    opt.textContent=unit;
+    $('unit').appendChild(opt);
   }
   $('unit').value=unit;
+
   $('barcode').value=p.barcode||'';
   $('note').value=p.note||'';
-  $('formTitle').textContent='Stok kaydını düzenle';$('save').textContent='Değişiklikleri kaydet';$('cancelEdit').classList.remove('hidden');show('add')
+  $('formTitle').textContent='Stok kaydını düzenle';
+  $('save').textContent='Değişiklikleri kaydet';
+  $('cancelEdit').classList.remove('hidden');
+
+  // Barkod otomatik doldurma mevcut değeri ezmesin.
+  if($('barcode').value.trim()==='') autoFillBarcode();
 }
 function resetForm(){db.editId=null;$('formTitle').textContent='Yeni stok kaydı';$('save').textContent='Kaydet';$('cancelEdit').classList.add('hidden');$('expiry').value='';$('qty').value=1;$('barcode').value='';$('note').value='';$('productTemplate').value=''}
 $('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange=autoFillBarcode;$('filter').onchange=renderProducts;$('search').oninput=renderProducts;
@@ -1532,49 +1619,105 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
-<style>
-#manualNotifPanel{margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.12);border-radius:14px}
-#manualNotifPanel input,#manualNotifPanel textarea{width:100%;box-sizing:border-box;margin:6px 0 10px;padding:10px;border-radius:9px;border:1px solid #ccc}
-#manualNotifStatus{margin-top:10px;font-size:13px}
-</style>
-<script>
-async function sendManualNotificationTest(){
-  const title=(document.getElementById('manualNotifTitle')?.value||'').trim();
-  const body=(document.getElementById('manualNotifBody')?.value||'').trim();
-  const status=document.getElementById('manualNotifStatus');
-  if(!title||!body){status.textContent='Başlık ve mesaj gerekli.';return;}
-  status.textContent='Bildirim hazırlanıyor...';
-  try{
-    if(!('Notification' in window)) throw new Error('Bu tarayıcı bildirimleri desteklemiyor.');
-    const permission=Notification.permission==='granted'
-      ? 'granted' : await Notification.requestPermission();
-    if(permission!=='granted') throw new Error('Bildirim izni verilmedi.');
-    new Notification(title,{body});
-    status.textContent='Test bildirimi gönderildi.';
-  }catch(e){
-    console.error(e);
-    status.textContent='Gönderilemedi: '+(e.message||e);
+<script id="notification-target-test">
+(function(){
+  function notifEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  async function initNotificationTargetTest(){
+    const card=document.getElementById('notificationAdminCard');
+    if(!card) return;
+    const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+    card.classList.toggle('hidden',!isAdmin);
+    if(!isAdmin) return;
+
+    const branchSel=document.getElementById('notifBranch');
+    const userSel=document.getElementById('notifUser');
+    const typeSel=document.getElementById('notifTargetType');
+    const branchWrap=document.getElementById('notifBranchWrap');
+    const userWrap=document.getElementById('notifUserWrap');
+    const summary=document.getElementById('notifTargetSummary');
+    const status=document.getElementById('notifStatus');
+
+    const activeBranches=(branchesCache||[]).filter(b=>b.is_active);
+    branchSel.innerHTML='<option value="">Şube seç...</option>'+activeBranches.map(b=>`<option value="${notifEsc(b.id)}">${notifEsc(b.name)}</option>`).join('');
+
+    let users=[];
+    try{
+      const r=await supabaseClient.from('profiles')
+        .select('id,full_name,username,branch_id,is_active')
+        .eq('is_active',true)
+        .order('full_name');
+      if(!r.error) users=r.data||[];
+    }catch(e){}
+
+    function refreshUsers(){
+      const bid=branchSel.value;
+      const list=users.filter(u=>!bid || String(u.branch_id)===String(bid));
+      userSel.innerHTML='<option value="">Kullanıcı seç...</option>'+list.map(u=>{
+        const name=u.full_name||u.username||'İsimsiz kullanıcı';
+        const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
+        return `<option value="${notifEsc(u.id)}">${notifEsc(name)}${branch?' · '+notifEsc(branch.name):''}</option>`;
+      }).join('');
+    }
+
+    function updateTargetUI(){
+      const t=typeSel.value;
+      branchWrap.classList.toggle('hidden',t==='all');
+      userWrap.classList.toggle('hidden',t!=='user');
+      if(t==='user') refreshUsers();
+
+      if(t==='all'){
+        summary.textContent='Hedef: Tüm şubeler · aktif kullanıcılar';
+      }else if(t==='branch'){
+        const b=activeBranches.find(x=>String(x.id)===String(branchSel.value));
+        summary.textContent=b?`Hedef: ${b.name} şubesindeki tüm aktif kullanıcılar`:'Hedef: Bir şube seçilmedi';
+      }else{
+        const u=users.find(x=>String(x.id)===String(userSel.value));
+        const b=u&&activeBranches.find(x=>String(x.id)===String(u.branch_id));
+        summary.textContent=u?`Hedef: ${u.full_name||u.username}${b?' · '+b.name:''}`:'Hedef: Bir kullanıcı seçilmedi';
+      }
+    }
+
+    typeSel.onchange=updateTargetUI;
+    branchSel.onchange=()=>{ if(typeSel.value==='user') refreshUsers(); updateTargetUI(); };
+    userSel.onchange=updateTargetUI;
+    updateTargetUI();
+
+    document.getElementById('notifPermissionBtn').onclick=async()=>{
+      status.textContent='';
+      if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
+        status.textContent='Bu sayfa Safari sekmesi olarak açık. iPhone Web Push için uygulamayı Ana Ekran\'a ekleyip oradan açmak gerekiyor.';
+        return;
+      }
+      try{
+        const permission=await Notification.requestPermission();
+        status.textContent=permission==='granted'
+          ? 'Bildirim izni verildi. Web Push aboneliği bir sonraki test adımında bağlanacak.'
+          : 'Bildirim izni verilmedi.';
+      }catch(e){status.textContent='Bildirim izni alınamadı: '+(e.message||e);}
+    };
+
+    document.getElementById('notifPreviewBtn').onclick=()=>{
+      const title=(document.getElementById('notifTitle').value||'').trim();
+      const body=(document.getElementById('notifBody').value||'').trim();
+      if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
+      const t=typeSel.value;
+      if(t==='branch' && !branchSel.value){status.textContent='Önce şube seç.';return;}
+      if(t==='user' && !userSel.value){status.textContent='Önce kullanıcı seç.';return;}
+      const target=summary.textContent.replace('Hedef: ','');
+      status.textContent=`Hazır: "${title}" → ${target}. Gerçek gönderim, Web Push sunucu bağlantısı tamamlandıktan sonra yapılacak.`;
+    };
   }
-}
-function addManualNotificationTestPanel(){
-  if(document.getElementById('manualNotifPanel')) return;
-  const all=[...document.querySelectorAll('section,div,main')];
-  const settings=all.find(el=>{
-    const t=(el.textContent||'').toLowerCase();
-    return t.includes('ayarlar') && (t.includes('bildirim') || t.includes('kullanıcı'));
-  });
-  if(!settings) return;
-  const panel=document.createElement('div');
-  panel.id='manualNotifPanel';
-  panel.innerHTML=`<h3>🔔 Bildirim Gönder — TEST</h3>
-    <div class="muted">Şimdilik sadece bu telefonda manuel bildirim testidir.</div>
-    <input id="manualNotifTitle" type="text" placeholder="Bildirim başlığı">
-    <textarea id="manualNotifBody" rows="3" placeholder="Bildirim mesajı"></textarea>
-    <button type="button" onclick="sendManualNotificationTest()">🔔 Test Bildirimi Gönder</button>
-    <div id="manualNotifStatus"></div>`;
-  settings.appendChild(panel);
-}
-document.addEventListener('DOMContentLoaded',()=>setTimeout(addManualNotificationTestPanel,800));
+
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){
+    window.showApp=async function(){
+      const r=await oldShowApp.apply(this,arguments);
+      setTimeout(initNotificationTargetTest,250);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(initNotificationTargetTest,700));
+})();
 </script>
 
 </body></html>
