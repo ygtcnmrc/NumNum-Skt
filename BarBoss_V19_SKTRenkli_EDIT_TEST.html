@@ -1263,29 +1263,63 @@ async function delStock(id){
   toast('Stok kaydı silindi.');
 }
 function editStock(id){
-  let p=db.products.find(x=>x.id===id);if(!p)return;
+  const p=db.products.find(x=>String(x.id)===String(id));
+  if(!p)return;
+
   db.editId=id;
+
+  // Önce düzenleme ekranını açıyoruz. show('add') ürün listesini
+  // yeniden oluşturduğu için mevcut ürün seçimini en son yapmalıyız.
+  show('add');
+
   const category=p.category||'';
   if(category&&!Array.from($('category').options).some(o=>o.value===category)){
-    let opt=document.createElement('option');opt.value=category;opt.textContent=category;$('category').appendChild(opt)
+    const opt=document.createElement('option');
+    opt.value=category;
+    opt.textContent=category;
+    $('category').appendChild(opt);
   }
   $('category').value=category;
+
+  // Kategoriye ait ürünleri doldur.
   renderProductTemplate();
+
+  // Supabase'den gelen kayıt yerel katalogda olmasa bile
+  // mevcut stok kaydındaki ürün mutlaka seçenek olarak gösterilsin.
   const productName=p.name||'';
-  if(productName&&!Array.from($('productTemplate').options).some(o=>o.value===productName)){
-    let opt=document.createElement('option');opt.value=productName;opt.textContent=productName;$('productTemplate').appendChild(opt)
+  if(productName){
+    let option=Array.from($('productTemplate').options).find(o=>o.value===productName);
+    if(!option){
+      option=document.createElement('option');
+      option.value=productName;
+      option.textContent=productName;
+      $('productTemplate').appendChild(option);
+    }
+    $('productTemplate').value=productName;
+  }else{
+    $('productTemplate').value='';
   }
-  $('productTemplate').value=productName;
+
   $('expiry').value=p.expiry||'';
   $('qty').value=p.qty??1;
+
   const unit=p.unit||'Adet';
   if(unit&&!Array.from($('unit').options).some(o=>o.value===unit)){
-    let opt=document.createElement('option');opt.value=unit;opt.textContent=unit;$('unit').appendChild(opt)
+    const opt=document.createElement('option');
+    opt.value=unit;
+    opt.textContent=unit;
+    $('unit').appendChild(opt);
   }
   $('unit').value=unit;
+
   $('barcode').value=p.barcode||'';
   $('note').value=p.note||'';
-  $('formTitle').textContent='Stok kaydını düzenle';$('save').textContent='Değişiklikleri kaydet';$('cancelEdit').classList.remove('hidden');show('add')
+  $('formTitle').textContent='Stok kaydını düzenle';
+  $('save').textContent='Değişiklikleri kaydet';
+  $('cancelEdit').classList.remove('hidden');
+
+  // Barkod otomatik doldurma mevcut değeri ezmesin.
+  if($('barcode').value.trim()==='') autoFillBarcode();
 }
 function resetForm(){db.editId=null;$('formTitle').textContent='Yeni stok kaydı';$('save').textContent='Kaydet';$('cancelEdit').classList.add('hidden');$('expiry').value='';$('qty').value=1;$('barcode').value='';$('note').value='';$('productTemplate').value=''}
 $('category').onchange=()=>renderProductTemplate();$('productTemplate').onchange=autoFillBarcode;$('filter').onchange=renderProducts;$('search').oninput=renderProducts;
