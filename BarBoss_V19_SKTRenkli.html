@@ -173,10 +173,47 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
 </section>
 <section id="settings" class="page hidden">
-<div class="card" id="adminDataCard">
+<div class="card" id="notificationAdminCard" style="margin-top:12px">
   <div class="row">
     <div>
-      <b>⚙️ Ayarlar</b>
+      <b>🔔 Bildirim Gönder</b>
+      <div class="muted" style="margin-top:4px">Önce şubeyi, sonra bir veya birden fazla alıcıyı seç.</div>
+    </div>
+  </div>
+
+  <label>🏢 Şubeler</label>
+  <select id="notifBranch">
+    <option value="all">🌐 Tüm şubeler</option>
+  </select>
+
+  <label style="margin-top:14px">👥 Alıcılar</label>
+  <div id="notifRecipients" style="border:1px solid #d9e0dc;border-radius:12px;background:#fff;overflow:hidden"></div>
+
+  <div class="actions" style="margin-top:10px">
+    <button class="secondary" type="button" id="notifSelectAll">☑️ Tümünü Seç</button>
+    <button class="secondary" type="button" id="notifClearAll">☐ Seçimleri Temizle</button>
+  </div>
+
+  <label style="margin-top:14px">Bildirim başlığı</label>
+  <input id="notifTitle" type="text" placeholder="Örn: SKT Uyarısı">
+
+  <label>Bildirim mesajı</label>
+  <textarea id="notifBody" rows="4" placeholder="Örn: SKT kontrolü yapılmalıdır." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d9e0dc;border-radius:11px;background:white;font-size:15px;margin-top:5px;resize:vertical"></textarea>
+
+  <div id="notifTargetSummary" class="productSelectNote" style="margin-top:10px">Şube: Tüm şubeler · Alıcı: 0 kişi</div>
+
+  <div class="actions" style="margin-top:10px">
+    <button class="secondary" type="button" id="notifPermissionBtn">🔔 Bildirimleri Etkinleştir</button>
+    <button class="primary" type="button" id="notifPreviewBtn">🎯 Hedefi Test Et</button>
+  </div>
+
+  <div id="notifStatus" class="muted" style="margin-top:10px"></div>
+</div>
+
+<div class="card" id="adminDataCard" style="margin-top:12px">
+  <div class="row">
+    <div>
+      <b>⚙️ Veri Yönetimi</b>
       <div class="muted" style="margin-top:4px">Veri yedekleme ve veri yönetimi.</div>
     </div>
   </div>
@@ -185,6 +222,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
     <button class="secondary dangerBtn" id="clear">Tüm veriyi sil</button>
   </div>
 </div>
+
 </section>
 <section id="branchManage" class="page hidden">
 <div class="card hidden" id="branchManagementCard"><div class="row"><div><b>🏢 Şube Yönetimi</b><div class="muted" style="margin-top:4px">Şube ekle, adını değiştir veya aktif/pasif durumunu yönet.</div></div><button class="secondary" id="refreshBranches">↻ Yenile</button></div><div style="display:flex;gap:8px;margin-top:12px"><input id="newBranchName" type="text" placeholder="Yeni şube adı" autocomplete="off" style="margin-top:0;flex:1"><button class="primary" id="addBranchBtn">➕ Ekle</button></div><div id="branchesAdminList" style="margin-top:12px"></div></div>
@@ -1576,4 +1614,172 @@ if('serviceWorker' in navigator){
     }catch(e){}
   });
 }
-</script></body></html>
+</script>
+
+<script id="notification-target-test">
+(function(){
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  async function initNotificationTargetTest(){
+    const card=document.getElementById('notificationAdminCard');
+    if(!card) return;
+    const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+    card.classList.toggle('hidden',!isAdmin);
+    if(!isAdmin) return;
+
+    const branchSel=document.getElementById('notifBranch');
+    const recipientsBox=document.getElementById('notifRecipients');
+    const summary=document.getElementById('notifTargetSummary');
+    const status=document.getElementById('notifStatus');
+
+    const activeBranches=(branchesCache||[]).filter(b=>b.is_active);
+    branchSel.innerHTML='<option value="all">🌐 Tüm şubeler</option>'+
+      activeBranches.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
+
+    let users=[];
+    try{
+      const r=await supabaseClient.from('profiles')
+        .select('id,full_name,username,branch_id,role,is_active')
+        .eq('is_active',true)
+        .order('full_name');
+      if(!r.error) users=r.data||[];
+    }catch(e){
+      console.warn('Bildirim alıcıları alınamadı:',e);
+    }
+
+    function roleKey(u){
+      const role=String(u.role||'').trim().toLowerCase();
+      if(role==='admin' || role.includes('admin')) return 'admin';
+      if(role==='yönetici' || role==='yonetici' || role==='manager' || role.includes('manager')) return 'manager';
+      return 'user';
+    }
+
+    function roleLabel(key){
+      if(key==='admin') return 'Admin';
+      if(key==='manager') return 'Yönetici';
+      return 'Kullanıcı';
+    }
+
+    function selectedIds(){
+      return [...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')]
+        .map(x=>x.dataset.userId);
+    }
+
+    function updateSummary(){
+      const ids=selectedIds();
+      const b=activeBranches.find(x=>String(x.id)===String(branchSel.value));
+      const branchText=branchSel.value==='all'?'Tüm şubeler':(b?.name||'Şube');
+      summary.textContent=`Şube: ${branchText} · Alıcı: ${ids.length} kişi`;
+    }
+
+    function recipientRow(u, branchId){
+      const name=u.full_name||u.username||'İsimsiz kullanıcı';
+      const key=roleKey(u);
+      const rt=roleLabel(key);
+      const branch=activeBranches.find(b=>String(b.id)===String(u.branch_id));
+      const branchText=branch ? ` · ${branch.name}` : '';
+      const initials=(name.trim().split(/\s+/).map(x=>x[0]).join('').slice(0,2)||'?').toUpperCase();
+      const roleIcon=key==='admin'?'👑':key==='manager'?'🛡️':'👤';
+      return `<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #edf1ef;cursor:pointer">
+        <input type="checkbox" data-user-id="${esc(u.id)}" data-user-name="${esc(name)}" style="width:19px;height:19px">
+        <span style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#eef5f1;font-weight:700;flex:0 0 36px">${esc(initials)}</span>
+        <span style="flex:1"><b>${esc(name)}</b><br><span class="muted">${roleIcon} ${esc(rt)}${branchId==='all'&&branch?` · ${esc(branch.name)}`:branchId!=='all'&&branch?` · ${esc(branch.name)}`:''}</span></span>
+      </label>`;
+    }
+
+    function groupHtml(title, icon, list, branchId){
+      if(!list.length) return '';
+      return `<div style="border-bottom:1px solid #e8eeeb">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f6f9f7;font-weight:700">${icon} ${esc(title)} <span class="muted">(${list.length})</span></div>
+        ${list.map(u=>recipientRow(u,branchId)).join('')}
+      </div>`;
+    }
+
+    function renderRecipients(){
+      const branchId=branchSel.value;
+      // Adminler tüm şubeleri görebildiği için hangi şube seçilirse seçilsin listede kalır.
+      // Kullanıcı ve yöneticiler yalnızca seçilen şubeye aitse listelenir.
+      const list=branchId==='all'
+        ? users
+        : users.filter(u=>{
+            const key=roleKey(u);
+            // Admin ve yöneticiler tüm şubelere erişebildiği için
+            // belirli bir şube seçildiğinde de alıcı listesinde kalırlar.
+            return key==='admin' || key==='manager' || String(u.branch_id)===String(branchId);
+          });
+
+      if(!list.length){
+        recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Bu hedef için aktif alıcı bulunamadı.</div>';
+        updateSummary();
+        return;
+      }
+
+      const admins=list.filter(u=>roleKey(u)==='admin');
+      const managers=list.filter(u=>roleKey(u)==='manager');
+      const normalUsers=list.filter(u=>roleKey(u)==='user');
+
+      recipientsBox.innerHTML=
+        groupHtml('Adminler','👑',admins,branchId)+
+        groupHtml('Yöneticiler','🛡️',managers,branchId)+
+        groupHtml('Kullanıcılar','👥',normalUsers,branchId);
+
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',updateSummary));
+      updateSummary();
+    }
+
+    branchSel.onchange=()=>{
+      // Şube değiştiğinde önceki hedef seçimini yanlışlıkla taşımıyoruz.
+      renderRecipients();
+    };
+
+    document.getElementById('notifSelectAll').onclick=()=>{
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
+      updateSummary();
+    };
+    document.getElementById('notifClearAll').onclick=()=>{
+      recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+      updateSummary();
+    };
+
+    document.getElementById('notifPermissionBtn').onclick=async()=>{
+      status.textContent='';
+      if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
+        status.textContent='Bu sayfa Safari sekmesi olarak açık. iPhone Web Push için uygulamayı Ana Ekran’a ekleyip oradan açmak gerekiyor.';
+        return;
+      }
+      try{
+        const permission=await Notification.requestPermission();
+        status.textContent=permission==='granted'
+          ? 'Bildirim izni verildi. Gerçek gönderim bağlantısı henüz eklenmedi.'
+          : 'Bildirim izni verilmedi.';
+      }catch(e){status.textContent='Bildirim izni alınamadı: '+(e.message||e);}
+    };
+
+    document.getElementById('notifPreviewBtn').onclick=()=>{
+      const title=(document.getElementById('notifTitle').value||'').trim();
+      const body=(document.getElementById('notifBody').value||'').trim();
+      const ids=selectedIds();
+      if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
+      if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
+      const names=[...recipientsBox.querySelectorAll('input[type=checkbox][data-user-id]:checked')].map(x=>x.dataset.userName);
+      const shown=names.slice(0,4).join(', ')+(names.length>4?` ve ${names.length-4} kişi daha`: '');
+      status.textContent=`Hazır: "${title}" → ${shown}. Gerçek gönderim bağlantısı henüz eklenmedi.`;
+    };
+
+    renderRecipients();
+  }
+
+  const oldShowApp=window.showApp;
+  if(typeof oldShowApp==='function'){
+    window.showApp=async function(){
+      const r=await oldShowApp.apply(this,arguments);
+      setTimeout(initNotificationTargetTest,250);
+      return r;
+    };
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(initNotificationTargetTest,700));
+})();
+</script>
+
+
+</body></html>
