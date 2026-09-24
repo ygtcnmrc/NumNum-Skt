@@ -434,14 +434,25 @@ async function loginWithUsername(username,password){
 }
 
 
-async function writeAudit({branchId,productId,action,fieldName=null,oldValue=null,newValue=null}){
+async function auditScopedField(fieldName,stockRecordId){
+  if(!stockRecordId)return fieldName;
+  return `${fieldName||'stock_record'}::stock:${stockRecordId}`;
+}
+function auditBaseField(fieldName){
+  return String(fieldName||'').split('::stock:')[0];
+}
+function auditStockMarker(fieldName){
+  const m=String(fieldName||'').match(/::stock:([^:]+)$/);
+  return m?m[1]:null;
+}
+async function writeAudit({branchId,productId,stockRecordId=null,action,fieldName=null,oldValue=null,newValue=null}){
   try{
     const {error}=await supabaseClient.from('audit_logs').insert({
       user_id:currentProfile?.id||null,
       branch_id:branchId||selectedBranchId||null,
       product_id:productId||null,
       action,
-      field_name:fieldName,
+      field_name:auditScopedField(fieldName,stockRecordId),
       old_value:oldValue==null?null:String(oldValue),
       new_value:newValue==null?null:String(newValue)
     });
@@ -779,13 +790,14 @@ function auditActionText(a){
   return map[a]||a||'İşlem yapıldı';
 }
 function auditFieldText(f){
+  const base=auditBaseField(f);
   const map={quantity:'Miktar',expiry_date:'SKT',product_id:'Ürün',unit:'Birim',stock_record:'Stok kaydı'};
-  return map[f]||f||'';
+  return map[base]||base||'';
 }
 function auditUserName(u){
   return (u?.full_name||u?.username||'Bilinmeyen kullanıcı').trim();
 }
-async function showProductHistory(productId,productName,branchId){
+async function showProductHistory(stockRecordId,productName,branchId){
   const modal=document.createElement('div');
   modal.className='auditHistoryModal';
   modal.innerHTML=`<div class="auditHistoryBox">
@@ -799,11 +811,14 @@ async function showProductHistory(productId,productName,branchId){
   modal.querySelector('#closeAuditHistory').onclick=()=>modal.remove();
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
   try{
-    let q=supabaseClient.from('audit_logs').select('id,user_id,branch_id,product_id,action,field_name,old_value,new_value,created_at').eq('product_id',productId).order('created_at',{ascending:false}).limit(100);
+    let q=supabaseClient.from('audit_logs')
+      .select('id,user_id,branch_id,product_id,action,field_name,old_value,new_value,created_at')
+      .ilike('field_name',`%::stock:${stockRecordId}`)
+      .order('created_at',{ascending:false}).limit(100);
     if(branchId) q=q.eq('branch_id',branchId);
     const {data,error}=await q;
     if(error) throw error;
-    const logs=data||[];
+    const logs=(data||[]).filter(l=>auditStockMarker(l.field_name)===String(stockRecordId));
     const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
     let users=[];
     if(ids.length){
@@ -813,7 +828,7 @@ async function showProductHistory(productId,productName,branchId){
     const userMap=Object.fromEntries(users.map(u=>[u.id,u]));
     const body=modal.querySelector('#auditHistoryBody');
     if(!logs.length){
-      body.innerHTML='<div class="empty">Bu ürün için henüz işlem geçmişi bulunmuyor.</div>';
+      body.innerHTML='<div class="empty">Bu stok kaydı için henüz işlem geçmişi bulunmuyor.</div>';
       return;
     }
     body.classList.remove('muted');
@@ -833,14 +848,7 @@ async function showProductHistory(productId,productName,branchId){
   }
 }
 
-function openProductHistoryByStockId(stockId){
-  const p=db.products.find(x=>x.id===stockId);
-  if(!p)return toast('Ürün bulunamadı.');
-  const branchId=p.branch_id||selectedBranchId||currentProfile?.branch_id||null;
-  return showProductHistory(p.product_id,p.name,branchId);
-}
-
-function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="secondary" onclick="openProductHistoryByStockId('${p.id}')">🕘 Geçmiş</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
+function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="secondary" onclick="showProductHistory('${p.id}',${jsarg(p.name)},'${p.branch_id||selectedBranchId||currentProfile?.branch_id||""}')">🕘 Geçmiş</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
 function renderSummary(){}
 function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
 function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
@@ -1177,7 +1185,7 @@ async function adjust(id,n){
   const next=Math.max(0,Number(p.qty)+n);
   const {error}=await supabaseClient.from('stock_records').update({quantity:next,updated_at:new Date().toISOString()}).eq('id',id).eq('branch_id',selectedBranchId);
   if(error){toast(error.message||'Miktar güncellenemedi.');return;}
-  await writeAudit({branchId:selectedBranchId,productId:p.product_id,action:n>0?'STOK_ARTIR':'STOK_AZALT',fieldName:'quantity',oldValue:p.qty,newValue:next});
+  await writeAudit({branchId:selectedBranchId,productId:p.product_id,stockRecordId:p.id,action:n>0?'STOK_ARTIR':'STOK_AZALT',fieldName:'quantity',oldValue:p.qty,newValue:next});
   await syncStockFromSupabase();
 }
 async function delStock(id){
@@ -1185,7 +1193,7 @@ async function delStock(id){
   if(!confirm('Bu stok kaydını silmek istiyor musun?'))return;
   const {error}=await supabaseClient.from('stock_records').delete().eq('id',id).eq('branch_id',selectedBranchId);
   if(error){toast(error.message||'Stok kaydı silinemedi.');return;}
-  await writeAudit({branchId:selectedBranchId,productId:p.product_id,action:'STOK_SIL',fieldName:'stock_record',oldValue:`${p.qty} ${p.unit} · SKT ${p.expiry}`,newValue:null});
+  await writeAudit({branchId:selectedBranchId,productId:p.product_id,stockRecordId:p.id,action:'STOK_SIL',fieldName:'stock_record',oldValue:`${p.qty} ${p.unit} · SKT ${p.expiry}`,newValue:null});
   await syncStockFromSupabase();
   toast('Stok kaydı silindi.');
 }
@@ -1214,10 +1222,10 @@ $('save').onclick=async()=>{
     const {error}=await supabaseClient.from('stock_records').update(payload).eq('id',editingId).eq('branch_id',branchId);
     if(error){toast(error.message||'Stok kaydı güncellenemedi.');return;}
     if(old){
-      if(old.quantity!==undefined) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'quantity',oldValue:old.qty,newValue:qty});
-      if(old.expiry!==exp) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'expiry_date',oldValue:old.expiry,newValue:exp});
-      if(old.product_id!==productId) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'product_id',oldValue:old.product_id,newValue:productId});
-      if(old.unit!==unit) await writeAudit({branchId,productId,action:'STOK_GUNCELLE',fieldName:'unit',oldValue:old.unit,newValue:unit});
+      if(old.quantity!==undefined) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'quantity',oldValue:old.qty,newValue:qty});
+      if(old.expiry!==exp) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'expiry_date',oldValue:old.expiry,newValue:exp});
+      if(old.product_id!==productId) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'product_id',oldValue:old.product_id,newValue:productId});
+      if(old.unit!==unit) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'unit',oldValue:old.unit,newValue:unit});
     }
     resetForm();await syncStockFromSupabase();show('products');toast(code?'Stok kaydı güncellendi · barkod ürün kataloğunda':'Stok kaydı güncellendi');return;
   }
@@ -1229,12 +1237,12 @@ $('save').onclick=async()=>{
       const newQty=Number(existing.qty)+qty;
       const upd=await supabaseClient.from('stock_records').update({quantity:newQty,updated_at:new Date().toISOString(),unit,note}).eq('id',existing.id).eq('branch_id',branchId);
       if(upd.error){toast(upd.error.message||'Mevcut stok güncellenemedi.');return;}
-      await writeAudit({branchId,productId,action:'STOK_BIRLESTIR',fieldName:'quantity',oldValue:existing.qty,newValue:newQty});
+      await writeAudit({branchId,productId,stockRecordId:existing.id,action:'STOK_BIRLESTIR',fieldName:'quantity',oldValue:existing.qty,newValue:newQty});
       resetForm();await syncStockFromSupabase();show('products');toast('Aynı ürün ve SKT zaten vardı; miktar üzerine eklendi.');return;
     }
   }
   if(error){toast(error.message||'Stok kaydı eklenemedi.');return;}
-  await writeAudit({branchId,productId,action:'STOK_EKLE',fieldName:'quantity',oldValue:null,newValue:qty});
+  await writeAudit({branchId,productId,stockRecordId:data?.id||null,action:'STOK_EKLE',fieldName:'quantity',oldValue:null,newValue:qty});
   if(code)db.barcodeMap[code]={category:cat,name};
   localStorage.setItem(KEY,JSON.stringify(db));resetForm();await syncStockFromSupabase();show('products');toast(code?'Stok kaydı eklendi · barkod ürünle eşleştirildi':'Stok kaydı eklendi');
 }
