@@ -35,6 +35,17 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 .userStat{background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;padding:10px}.userStat b{display:block;font-size:20px}.userStat span{font-size:11px;color:var(--muted)}.userRow{border:1px solid #e8eeea;border-radius:14px;padding:12px;margin-top:9px}.userRow .meta{font-size:11px;color:var(--muted);margin-top:3px}.userActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.roleBadge{padding:4px 7px;border-radius:20px;background:#e3f3ed;color:var(--g2);font-size:10px;font-weight:800}.userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:8px 10px;border-radius:12px;background:#ffffff18;font-size:12px}.userBar button{border:0;background:#fff;color:var(--g2);border-radius:9px;padding:7px 10px;font-weight:800;font-size:11px}.branchBar{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:11px;background:#ffffff16}.branchBar span{font-size:11px;opacity:.9;white-space:nowrap}.branchBar select{margin:0;flex:1;padding:8px 10px;border:0;border-radius:9px;background:#fff;color:var(--g2);font-weight:800;font-size:12px;min-width:0}.branchBar select:disabled{opacity:.9}
 
 .menuWrap{position:relative;display:inline-flex;flex:0 0 auto}.menuBtn{font-size:22px;line-height:1;min-width:38px}.actionMenu{position:absolute;right:0;top:calc(100% + 5px);z-index:80;min-width:190px;background:#fff;border:1px solid #dfe7e2;border-radius:12px;box-shadow:0 10px 28px #0002;padding:5px}.actionMenu button{display:block;width:100%;border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:8px;font:inherit}.actionMenu button:hover{background:#f1f6f3}.actionMenu .dangerText{color:#b91c1c}.categoryCard{padding:0;overflow:visible}.categoryCard summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px}.categoryCard summary::-webkit-details-marker{display:none}.categoryProducts{padding:0 14px 14px}.categoryProductRow{padding:9px 0;border-top:1px solid #f0f2f1;min-height:42px}.categoryProductRow .small{flex:1}.</style>
+<style id="audit-history-style">
+.auditHistoryItem{padding:12px 0;border-top:1px solid #edf1ef}
+.auditHistoryItem:first-child{border-top:0}
+.auditHistoryHead{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.auditHistoryAction{font-weight:800;color:#176b49}
+.auditHistoryMeta{font-size:12px;color:#738078;margin-top:4px}
+.auditHistoryChange{font-size:13px;margin-top:6px;color:#3e4943}
+.auditHistoryModal{position:fixed;inset:0;background:#0008;z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px}
+.auditHistoryBox{width:min(92vw,520px);max-height:82vh;overflow:auto;background:#fff;border-radius:20px;padding:18px;box-shadow:0 20px 60px #0004}
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta name="application-name" content="NN BarBoss">
 <meta name="apple-mobile-web-app-title" content="NN BarBoss">
@@ -749,7 +760,80 @@ function fillCats(){let o=db.categories.map(c=>`<option>${esc(c)}</option>`).joi
 function renderStats(){let ps=db.products;$('total').textContent=ps.length;$('d30').textContent=ps.filter(p=>days(p)>=0&&days(p)<=30).length;$('d15').textContent=ps.filter(p=>days(p)>=0&&days(p)<=15).length;$('d5').textContent=ps.filter(p=>days(p)>=0&&days(p)<=5).length}
 function renderAlerts(){let ps=db.products.filter(p=>{let d=days(p);return d>=0&&d<=30}).sort((a,b)=>days(a)-days(b));let ex=db.products.filter(p=>days(p)<0).sort((a,b)=>days(a)-days(b));let out='';if(ex.length)out+=`<div class="sectionTitle">⛔ Süresi geçen</div>`+ex.slice(0,15).map(alertCard).join('');if(ps.length)out+=`<div class="sectionTitle">SKT yaklaşan ürünler</div>`+ps.slice(0,30).map(alertCard).join('');$('alerts').innerHTML=out||'<div class="empty">🎉 Yaklaşan SKT yok.</div>'}
 function alertCard(p){let [cl,t]=level(p);return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><div class="muted">SKT: ${fmt(p.expiry)}</div></div>`}
-function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
+
+function formatAuditDate(v){
+  if(!v)return '-';
+  try{
+    return new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(v));
+  }catch(e){return new Date(v).toLocaleString('tr-TR');}
+}
+function auditActionText(a){
+  const map={
+    STOK_EKLE:'Ürün eklendi',
+    STOK_GUNCELLE:'Ürün düzenlendi',
+    STOK_BIRLESTIR:'Mevcut stoğa eklendi',
+    STOK_ARTIR:'Stok artırıldı',
+    STOK_AZALT:'Stok azaltıldı',
+    STOK_SIL:'Stok kaydı silindi'
+  };
+  return map[a]||a||'İşlem yapıldı';
+}
+function auditFieldText(f){
+  const map={quantity:'Miktar',expiry_date:'SKT',product_id:'Ürün',unit:'Birim',stock_record:'Stok kaydı'};
+  return map[f]||f||'';
+}
+function auditUserName(u){
+  return (u?.full_name||u?.username||'Bilinmeyen kullanıcı').trim();
+}
+async function showProductHistory(productId,productName,branchId){
+  const modal=document.createElement('div');
+  modal.className='auditHistoryModal';
+  modal.innerHTML=`<div class="auditHistoryBox">
+    <div class="row" style="margin-bottom:8px">
+      <div><h3 style="margin:0">🕘 İşlem Geçmişi</h3><div class="muted">${esc(productName)}</div></div>
+      <button class="icon" type="button" id="closeAuditHistory">✕</button>
+    </div>
+    <div id="auditHistoryBody" class="muted">Geçmiş yükleniyor...</div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector('#closeAuditHistory').onclick=()=>modal.remove();
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
+  try{
+    let q=supabaseClient.from('audit_logs').select('id,user_id,branch_id,product_id,action,field_name,old_value,new_value,created_at').eq('product_id',productId).order('created_at',{ascending:false}).limit(100);
+    if(branchId) q=q.eq('branch_id',branchId);
+    const {data,error}=await q;
+    if(error) throw error;
+    const logs=data||[];
+    const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
+    let users=[];
+    if(ids.length){
+      const r=await supabaseClient.from('profiles').select('id,full_name,username').in('id',ids);
+      if(!r.error) users=r.data||[];
+    }
+    const userMap=Object.fromEntries(users.map(u=>[u.id,u]));
+    const body=modal.querySelector('#auditHistoryBody');
+    if(!logs.length){
+      body.innerHTML='<div class="empty">Bu ürün için henüz işlem geçmişi bulunmuyor.</div>';
+      return;
+    }
+    body.classList.remove('muted');
+    body.innerHTML=logs.map(l=>{
+      const user=userMap[l.user_id];
+      const change=(l.field_name||l.old_value!=null||l.new_value!=null)
+        ? `<div class="auditHistoryChange"><b>${esc(auditFieldText(l.field_name))}</b>${l.old_value!=null?` · ${esc(l.old_value)}`:''}${l.new_value!=null?` → <b>${esc(l.new_value)}</b>`:''}</div>`
+        : '';
+      return `<div class="auditHistoryItem">
+        <div class="auditHistoryHead"><span class="auditHistoryAction">${esc(auditActionText(l.action))}</span><span class="small">${esc(formatAuditDate(l.created_at))}</span></div>
+        <div class="auditHistoryMeta">👤 ${esc(auditUserName(user))}</div>${change}
+      </div>`;
+    }).join('');
+  }catch(err){
+    console.error('İşlem geçmişi okunamadı:',err);
+    modal.querySelector('#auditHistoryBody').innerHTML='<div class="empty">İşlem geçmişi okunamadı.</div>';
+  }
+}
+
+function renderProducts(){let q=($('search').value||'').toLowerCase(),f=$('filter').value;let ps=db.products.filter(p=>{let d=days(p);return (!f||p.category===f)&&(!q||[p.name,p.category,p.barcode,p.note].join(' ').toLowerCase().includes(q))&&(!expiryRange||d>=expiryRange.min&&d<=expiryRange.max)}).sort((a,b)=>days(a)-days(b));let heading=expiryRange?`<div class="card" style="background:#eef8f4"><div class="row"><b>${esc(expiryRange.title)}</b><button class="secondary" id="clearExpiry">Tüm stoklar</button></div></div>`:'';$('productList').innerHTML=heading+(ps.length?ps.map(p=>{let [cl,t]=level(p);return `<div class="card item"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><p>SKT: <b>${fmt(p.expiry)}</b></p><div class="muted">${p.barcode?'Barkod: '+esc(p.barcode)+' · ':''}${esc(p.note||'')}</div><div class="actions" style="justify-content:flex-end;margin-top:9px"><button class="icon" onclick="adjust('${p.id}',-1)">−</button><button class="icon" onclick="adjust('${p.id}',1)">+</button><button class="secondary" onclick="editStock('${p.id}')">✏️ Düzenle</button><button class="secondary" onclick="showProductHistory('${p.product_id}',${jsarg(p.name)},'${p.branch_id||selectedBranchId||currentProfile?.branch_id||""}')">🕘 Geçmiş</button><button class="icon dangerBtn" onclick="delStock('${p.id}')">🗑️</button></div></div>`}).join(''):'<div class="empty">Bu aralıkta ürün yok.</div>');if($('clearExpiry'))$('clearExpiry').onclick=()=>{expiryRange=null;renderProducts()}}
 function renderSummary(){}
 function renderProductTemplate(){let c=$('category').value;let arr=db.catalog[c]||[];$('productTemplate').innerHTML='<option value="">Ürün seç...</option>'+arr.map(p=>`<option>${esc(p)}</option>`).join(''); autoFillBarcode()}
 function autoFillBarcode(){let c=$('category').value,n=$('productTemplate').value;if(!c||!n)return;let hit=Object.entries(db.barcodeMap||{}).find(([code,v])=>v&&v.category===c&&v.name===n);if(hit&&!$('barcode').value.trim())$('barcode').value=hit[0]}
