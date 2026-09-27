@@ -29,6 +29,15 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 .search{position:relative}.search input{padding-left:38px}.search span{position:absolute;left:13px;top:15px}.item h3{margin:0;font-size:16px}.item p{margin:5px 0}.empty{text-align:center;color:var(--muted);padding:35px 10px}.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:9px}.toolbar>*{flex:1}.hidden{display:none!important}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#17221d;color:#fff;padding:12px 16px;border-radius:12px;z-index:30;font-size:13px;max-width:90%;box-shadow:0 5px 20px #0004}
 .sectionTitle{font-size:14px;font-weight:800;margin:18px 0 8px}.catChip{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#f7faf8;border:1px solid #e8eeea;border-radius:12px;margin:7px 0}.small{font-size:11px}.actions{display:flex;gap:6px;flex-wrap:wrap}.productSelectNote{background:#eef8f4;border-radius:10px;padding:9px;font-size:11px;color:#356253;margin-top:8px}.iconGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px}.emojiBtn{border:1px solid #e1e7e3;background:#f7faf8;border-radius:12px;padding:10px 4px;font-size:24px;cursor:pointer}.emojiBtn.selected{border:2px solid var(--g);background:#e5f4ee}.catIconPreview{font-size:30px;line-height:1}
 @media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr);gap:10px}.stat{min-height:108px;padding:15px 14px}.statLabel{font-size:16px}.stat b{font-size:34px;margin-top:12px}.grid2,.grid3{grid-template-columns:1fr}.toolbar{display:grid;grid-template-columns:1fr}.toolbar>*{width:100%}}
+#notificationPermissionModal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px}
+#notificationPermissionModal.hidden{display:none!important}
+.notificationPermissionBox{width:min(420px,100%);background:#fff;border-radius:22px;padding:24px 20px;box-shadow:0 18px 60px #0005;text-align:center}
+.notificationPermissionIcon{font-size:48px;line-height:1;margin-bottom:12px}
+.notificationPermissionBox h2{margin:0;color:#18221e;font-size:22px}
+.notificationPermissionBox p{margin:10px 0 18px;color:#68756e;font-size:14px;line-height:1.5}
+#notificationPermissionAllow{width:100%;padding:13px 16px;border:0;border-radius:13px;background:var(--g);color:#fff;font-weight:800;font-size:15px;cursor:pointer}
+#notificationPermissionStatus{min-height:18px;margin-top:10px;color:#b91c1c;font-size:12px;line-height:1.4}
+
 
 /* Login */
 #loginScreen{position:fixed;inset:0;background:#00774E;z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px 15px;overflow:hidden}
@@ -114,6 +123,15 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 
 </head>
 <body>
+<div id="notificationPermissionModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="notificationPermissionTitle">
+  <div class="notificationPermissionBox">
+    <div class="notificationPermissionIcon">🔔</div>
+    <h2 id="notificationPermissionTitle">Bildirimleri Etkinleştir</h2>
+    <p>BarBoss’tan gelen önemli bildirimleri kaçırmamak için bildirimlere izin verin.</p>
+    <button type="button" id="notificationPermissionAllow">🔔 Bildirimlere İzin Ver</button>
+    <div id="notificationPermissionStatus"></div>
+  </div>
+</div>
 
 <div id="nnbWelcome" aria-hidden="true">
   <div class="nnbWelcomeCard">
@@ -1834,11 +1852,77 @@ if('serviceWorker' in navigator){
     };
   }
 
+  async function enablePushForCurrentDevice(){
+    if(!currentProfile?.id) throw new Error('Oturum bilgisi bulunamadı.');
+    if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window))
+      throw new Error('iPhone Web Push için uygulamayı Ana Ekran’a ekleyip oradan açmalısın.');
+    let permission=Notification.permission;
+    if(permission!=='granted') permission=await Notification.requestPermission();
+    if(permission!=='granted') throw new Error('Bildirim izni verilmedi.');
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(sub){
+      await saveCurrentPushSubscription();
+      return;
+    }
+    const newSub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    const json=newSub.toJSON();
+    const endpoint=json.endpoint, p256dh=json.keys?.p256dh, auth=json.keys?.auth;
+    if(!endpoint||!p256dh||!auth) throw new Error('Bildirim aboneliği anahtarları alınamadı.');
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    const userId=session?.user?.id||currentProfile.id;
+    if(!userId) throw new Error('Supabase kullanıcı oturumu bulunamadı.');
+    const {error}=await supabaseClient.from('push_subscriptions').upsert({
+      user_id:userId, endpoint, p256dh, auth, updated_at:new Date().toISOString()
+    },{onConflict:'endpoint'});
+    if(error) throw error;
+  }
+
+  async function maybeShowNotificationPermissionPrompt(){
+    const modal=document.getElementById('notificationPermissionModal');
+    if(!modal||!currentProfile?.id)return;
+    if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window))return;
+    try{
+      await navigator.serviceWorker.ready;
+      const sub=await navigator.serviceWorker.ready.then(reg=>reg.pushManager.getSubscription());
+      if(sub){
+        try{await saveCurrentPushSubscription();}catch(_){}
+        modal.classList.add('hidden');
+        return;
+      }
+    }catch(_){}
+    modal.classList.remove('hidden');
+  }
+
+  const notificationPermissionAllow=document.getElementById('notificationPermissionAllow');
+  const notificationPermissionModal=document.getElementById('notificationPermissionModal');
+  const notificationPermissionStatus=document.getElementById('notificationPermissionStatus');
+  notificationPermissionAllow?.addEventListener('click',async()=>{
+    notificationPermissionAllow.disabled=true;
+    notificationPermissionAllow.textContent='⏳ Bildirimler etkinleştiriliyor…';
+    notificationPermissionStatus.textContent='';
+    try{
+      await enablePushForCurrentDevice();
+      notificationPermissionModal?.classList.add('hidden');
+      notificationPermissionStatus.textContent='';
+      if(typeof refreshDeviceNotificationState==='function') await refreshDeviceNotificationState();
+    }catch(e){
+      notificationPermissionStatus.textContent=e?.message||'Bildirim izni verilmedi. İzin verdiğinizde bu pencere kapanacaktır.';
+    }finally{
+      notificationPermissionAllow.disabled=false;
+      notificationPermissionAllow.textContent='🔔 Bildirimlere İzin Ver';
+    }
+  });
+
   let tries=0; const timer=setInterval(async()=>{
     tries++;
     if(currentProfile?.id){
       clearInterval(timer);
       await refreshDeviceNotificationState();
+      await maybeShowNotificationPermissionPrompt();
       const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
       document.getElementById('adminDataCard')?.classList.toggle('hidden',!isAdmin);
       document.getElementById('notificationAdminCard')?.classList.toggle('hidden',!isAdmin);
