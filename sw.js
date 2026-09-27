@@ -1,6 +1,7 @@
-const CACHE='numnum-skt-v1-3';
+const CACHE='numnum-skt-v1-4';
 
-const APP_URL = new URL('./BarBoss_V19_SKTRenkli.html', self.location.origin).href;
+// GitHub Pages repo yolu
+const APP_URL = new URL('/NumNum-Skt/BarBoss_V19_SKTRenkli.html', self.location.origin).href;
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -16,7 +17,6 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Gerçek Web Push bildirimi.
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) {
@@ -24,40 +24,47 @@ self.addEventListener('push', event => {
   }
 
   const title = data.title || 'NN BarBoss';
-  const options = {
-    body: data.body || '',
-    icon: data.icon || './icon-192.png',
-    badge: data.badge || './icon-192.png',
-    // URL gönderilmezse doğrudan BarBoss ana sayfasını aç.
-    data: data.data || { url: APP_URL },
-    vibrate: [100, 50, 100],
-    tag: data.tag || 'barboss-notification',
-    renotify: true
-  };
+  const incomingData = (data.data && typeof data.data === 'object') ? data.data : {};
+  const incomingUrl = incomingData.url || data.url || APP_URL;
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: data.icon || './icon-192.png',
+      badge: data.badge || './icon-192.png',
+      data: { url: incomingUrl },
+      vibrate: [100, 50, 100],
+      tag: data.tag || 'barboss-notification',
+      renotify: true
+    })
+  );
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil((async () => {
-    let target = event.notification?.data?.url;
+    let target = event.notification?.data?.url || APP_URL;
 
-    // Eski bildirimlerde './' veya '/' gönderilmiş olabilir.
-    // Bunları GitHub Pages köküne değil, gerçek BarBoss HTML'sine yönlendir.
     try {
-      if (!target || target === './' || target === '/' ||
-          target === self.location.origin || target === self.location.origin + '/') {
+      const resolved = new URL(target, APP_URL);
+
+      // Kök GitHub Pages adresi veya eski hatalı yollar gelirse
+      // doğrudan gerçek BarBoss sayfasına git.
+      if (
+        resolved.origin === self.location.origin &&
+        (
+          resolved.pathname === '/' ||
+          resolved.pathname === '' ||
+          resolved.pathname === '/NumNum-Skt/' ||
+          resolved.pathname === '/NumNum-Skt'
+        )
+      ) {
         target = APP_URL;
+      } else if (resolved.origin === self.location.origin) {
+        target = resolved.href;
       } else {
-        const resolved = new URL(target, self.location.origin);
-        if (resolved.origin === self.location.origin &&
-            (resolved.pathname === '/' || resolved.pathname === '')) {
-          target = APP_URL;
-        } else {
-          target = resolved.href;
-        }
+        target = APP_URL;
       }
     } catch (_) {
       target = APP_URL;
@@ -70,8 +77,8 @@ self.addEventListener('notificationclick', event => {
 
     for (const client of allClients) {
       try {
-        await client.focus();
         if ('navigate' in client) await client.navigate(target);
+        await client.focus();
         return;
       } catch (_) {}
     }
@@ -94,16 +101,13 @@ self.addEventListener('fetch', event => {
 
   if (isPage) {
     event.respondWith(
-      fetch(event.request, {cache:'no-store'})
+      fetch(event.request, { cache: 'no-store' })
         .then(response => {
           const copy = response.clone();
           caches.open(CACHE).then(cache => cache.put(event.request, copy));
           return response;
         })
-        .catch(() =>
-          caches.match(event.request)
-            .then(cached => cached || caches.match('./BarBoss_V19_SKTRenkli.html'))
-        )
+        .catch(() => caches.match(APP_URL))
     );
     return;
   }
