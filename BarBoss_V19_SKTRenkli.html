@@ -5,6 +5,9 @@
 <meta name="theme-color" content="#087f45"><title>NN BarBoss</title>
 <style>
 nav{overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+#notificationAdminCard select{display:block;width:100%;min-height:52px;box-sizing:border-box;position:relative;z-index:2;pointer-events:auto;-webkit-appearance:auto;appearance:auto}
+#notificationAdminCard input[type="checkbox"]{pointer-events:auto;accent-color:#087b55}
+#notificationAdminCard #notifRecipients{position:relative;z-index:1;pointer-events:auto}
 nav::-webkit-scrollbar{display:none}
 nav button{flex:0 0 auto;min-width:82px}
 
@@ -1537,13 +1540,41 @@ if('serviceWorker' in navigator){
     const summary=document.getElementById('notifTargetSummary');
     const status=document.getElementById('notifStatus');
     if(!branchSel||!recipientsBox||!summary||!status)return;
-    const activeBranches=(branchesCache||[]).filter(b=>b.is_active);
-    branchSel.innerHTML='<option value="all">🌐 Tüm şubeler</option>'+activeBranches.map(b=>`<option value="${escN(b.id)}">${escN(b.name)}</option>`).join('');
+    // Bildirim paneli bağımsız olarak kendi şube listesini yüklesin.
+    // Sayfa ilk açıldığında branchesCache henüz dolmamış olabileceği için
+    // yalnızca cache'e güvenmek iOS'ta seçim listesinin boş kalmasına neden oluyordu.
+    let activeBranches=[];
+    try{
+      const br=await supabaseClient.from('branches')
+        .select('id,name,is_active')
+        .eq('is_active',true)
+        .order('name');
+      if(br.error) throw br.error;
+      activeBranches=br.data||[];
+      branchesCache=activeBranches;
+    }catch(e){
+      status.textContent='❌ Şubeler yüklenemedi: '+(e.message||e);
+      branchSel.innerHTML='<option value="all">🌐 Tüm şubeler</option>';
+      recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Şubeler yüklenemedi.</div>';
+      return;
+    }
+
+    branchSel.innerHTML='<option value="all">🌐 Tüm şubeler</option>'+
+      activeBranches.map(b=>`<option value="${escN(b.id)}">${escN(b.name)}</option>`).join('');
+
     let users=[];
     try{
-      const r=await supabaseClient.from('profiles').select('id,full_name,username,branch_id,role,is_active').eq('is_active',true).order('full_name');
-      if(r.error) throw r.error; users=r.data||[];
-    }catch(e){status.textContent='Alıcılar yüklenemedi: '+(e.message||e);return;}
+      const r=await supabaseClient.from('profiles')
+        .select('id,full_name,username,branch_id,role,is_active')
+        .eq('is_active',true)
+        .order('full_name');
+      if(r.error) throw r.error;
+      users=r.data||[];
+    }catch(e){
+      status.textContent='❌ Alıcılar yüklenemedi: '+(e.message||e);
+      recipientsBox.innerHTML='<div style="padding:14px;color:#6b7b74">Alıcılar yüklenemedi.</div>';
+      return;
+    }
     function roleKey(u){
       const role=String(u.role||'').trim().toLowerCase();
       if(role==='admin'||role.includes('admin'))return 'admin';
@@ -1661,7 +1692,7 @@ if('serviceWorker' in navigator){
       const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
       document.getElementById('adminDataCard')?.classList.toggle('hidden',!isAdmin);
       document.getElementById('notificationAdminCard')?.classList.toggle('hidden',!isAdmin);
-      if(isAdmin&&(branchesCache||[]).length) await initNotificationTargetTest();
+      if(isAdmin) await initNotificationTargetTest();
     }else if(tries>=40)clearInterval(timer);
   },500);
 })();
