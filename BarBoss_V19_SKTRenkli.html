@@ -1621,17 +1621,74 @@ if('serviceWorker' in navigator){
         status.textContent='✅ Bu cihaz bildirim alıcısı olarak kaydedildi.';
       }catch(e){status.textContent='Bildirim kurulamadı: '+(e.message||e);}
     };
+    async function readFunctionError(e){
+      let detail=e?.message||String(e||'Bilinmeyen hata');
+      try{
+        const ctx=e?.context;
+        if(ctx && typeof ctx.clone==='function'){
+          const txt=await ctx.clone().text();
+          if(txt){
+            try{
+              const j=JSON.parse(txt);
+              detail=j?.error||j?.message||j?.detail||txt;
+            }catch(_){detail=txt;}
+          }
+        }
+      }catch(_){}
+      return detail;
+    }
     document.getElementById('notifPreviewBtn').onclick=async()=>{
-      const title=(document.getElementById('notifTitle').value||'').trim(),body=(document.getElementById('notifBody').value||'').trim(),ids=selectedIds();
+      const title=(document.getElementById('notifTitle').value||'').trim();
+      const body=(document.getElementById('notifBody').value||'').trim();
+      const ids=selectedIds();
       if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
       if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
       try{
-        status.textContent='Gönderiliyor…';
-        const {data,error}=await supabaseClient.functions.invoke('send-notification',{body:{recipient_ids:ids,title,message:body}});
-        if(error) throw error;
-        const sent=data?.sent??0, failed=data?.failed??0, missing=data?.missing??0;
+        status.textContent='📡 Alıcı cihaz kayıtları kontrol ediliyor…';
+
+        // Edge Function doğrudan Web Push subscription bekliyor.
+        // Admin panelinde kullanıcı ID'si seçildiği için önce bu kullanıcıların
+        // kayıtlı endpoint/p256dh/auth bilgilerini Supabase'den alıyoruz.
+        const {data:subs,error:subsError}=await supabaseClient
+          .from('push_subscriptions')
+          .select('user_id,endpoint,p256dh,auth')
+          .in('user_id',ids);
+
+        if(subsError) throw new Error('Cihaz abonelikleri okunamadı: '+subsError.message);
+
+        const subscriptions=(subs||[])
+          .filter(x=>x?.endpoint&&x?.p256dh&&x?.auth)
+          .map(x=>({endpoint:x.endpoint,p256dh:x.p256dh,auth:x.auth,user_id:x.user_id}));
+
+        if(!subscriptions.length){
+          status.textContent='❌ Seçilen alıcıların hiçbirinde kayıtlı bildirim cihazı bulunamadı.';
+          return;
+        }
+
+        status.textContent=`📨 ${subscriptions.length} cihaz için gönderiliyor…`;
+
+        const payload={
+          recipient_ids:ids,
+          subscriptions,
+          title,
+          message:body,
+          data:{title,message:body,recipient_ids:ids}
+        };
+
+        const {data,error}=await supabaseClient.functions.invoke('send-notification',{body:payload});
+        if(error){
+          const detail=await readFunctionError(error);
+          throw new Error(detail);
+        }
+
+        const sent=data?.sent??subscriptions.length;
+        const failed=data?.failed??0;
+        const missing=data?.missing??0;
         status.textContent=`✅ Gönderim tamamlandı. Başarılı: ${sent} · Başarısız: ${failed}${missing?` · Cihaz kaydı yok: ${missing}`:''}`;
-      }catch(e){status.textContent='❌ Gönderim başarısız: '+(e.message||e);}
+      }catch(e){
+        const detail=await readFunctionError(e);
+        status.textContent='❌ Gönderim başarısız: '+detail;
+      }
     };
     initialized=true; renderRecipients();
   }
