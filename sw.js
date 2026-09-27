@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v2-0';
+const CACHE='numnum-skt-v2-1';
 
 // GitHub Pages repo yolu
 const APP_URL = new URL('/NumNum-Skt/BarBoss_V19_SKTRenkli.html', self.location.origin).href;
