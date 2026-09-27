@@ -1644,35 +1644,16 @@ if('serviceWorker' in navigator){
       if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
       if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
       try{
-        status.textContent='📡 Alıcı cihaz kayıtları kontrol ediliyor…';
+        status.textContent='📡 Seçilen alıcıların bildirim cihazları kontrol ediliyor…';
 
-        // Edge Function doğrudan Web Push subscription bekliyor.
-        // Admin panelinde kullanıcı ID'si seçildiği için önce bu kullanıcıların
-        // kayıtlı endpoint/p256dh/auth bilgilerini Supabase'den alıyoruz.
-        const {data:subs,error:subsError}=await supabaseClient
-          .from('push_subscriptions')
-          .select('user_id,endpoint,p256dh,auth')
-          .in('user_id',ids);
-
-        if(subsError) throw new Error('Cihaz abonelikleri okunamadı: '+subsError.message);
-
-        const subscriptions=(subs||[])
-          .filter(x=>x?.endpoint&&x?.p256dh&&x?.auth)
-          .map(x=>({endpoint:x.endpoint,p256dh:x.p256dh,auth:x.auth,user_id:x.user_id}));
-
-        if(!subscriptions.length){
-          status.textContent='❌ Seçilen alıcıların hiçbirinde kayıtlı bildirim cihazı bulunamadı.';
-          return;
-        }
-
-        status.textContent=`📨 ${subscriptions.length} cihaz için gönderiliyor…`;
-
+        // Edge Function kendi service-role yetkisiyle push_subscriptions
+        // tablosunu okuyor. Bu nedenle burada RLS nedeniyle abonelikleri
+        // doğrudan istemci tarafından okumaya çalışmıyoruz.
+        // Fonksiyonun beklediği alan user_ids.
         const payload={
-          recipient_ids:ids,
-          subscriptions,
+          user_ids:ids,
           title,
-          message:body,
-          data:{title,message:body,recipient_ids:ids}
+          message:body
         };
 
         const {data,error}=await supabaseClient.functions.invoke('send-notification',{body:payload});
@@ -1681,10 +1662,14 @@ if('serviceWorker' in navigator){
           throw new Error(detail);
         }
 
-        const sent=data?.sent??subscriptions.length;
+        const sent=data?.sent??0;
         const failed=data?.failed??0;
-        const missing=data?.missing??0;
-        status.textContent=`✅ Gönderim tamamlandı. Başarılı: ${sent} · Başarısız: ${failed}${missing?` · Cihaz kaydı yok: ${missing}`:''}`;
+        const total=data?.total??(sent+failed);
+        if(total===0){
+          status.textContent='⚠️ Seçilen kullanıcılar için kayıtlı bildirim cihazı bulunamadı. Önce ilgili cihazda Bildirimleri Etkinleştir / Aboneliği yenile yapılmalı.';
+        }else{
+          status.textContent=`✅ Gönderim tamamlandı. Başarılı: ${sent} · Başarısız: ${failed} · Toplam cihaz: ${total}`;
+        }
       }catch(e){
         const detail=await readFunctionError(e);
         status.textContent='❌ Gönderim başarısız: '+detail;
