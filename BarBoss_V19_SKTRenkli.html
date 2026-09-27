@@ -1522,11 +1522,40 @@ if('serviceWorker' in navigator){
     const p256dh=json.keys?.p256dh;
     const auth=json.keys?.auth;
     if(!endpoint||!p256dh||!auth) throw new Error('Push aboneliği anahtarları alınamadı.');
+
+    // Oturumun gerçekten Supabase auth kullanıcısıyla eşleştiğini garanti et.
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    const userId=session?.user?.id||currentProfile.id;
+    if(!userId) throw new Error('Supabase kullanıcı oturumu bulunamadı.');
+
     const {error}=await supabaseClient.from('push_subscriptions').upsert({
-      user_id:currentProfile.id, endpoint, p256dh, auth, updated_at:new Date().toISOString()
+      user_id:userId, endpoint, p256dh, auth, updated_at:new Date().toISOString()
     },{onConflict:'endpoint'});
     if(error) throw error;
     return sub;
+  }
+
+  async function forceRefreshCurrentPushSubscription(){
+    if(!currentProfile?.id) throw new Error('Oturum bilgisi bulunamadı.');
+    const reg=await navigator.serviceWorker.ready;
+    const oldSub=await reg.pushManager.getSubscription();
+    if(oldSub){
+      try{ await oldSub.unsubscribe(); }catch(_){ }
+    }
+    const newSub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    const json=newSub.toJSON();
+    const endpoint=json.endpoint, p256dh=json.keys?.p256dh, auth=json.keys?.auth;
+    if(!endpoint||!p256dh||!auth) throw new Error('Yeni push aboneliği oluşturulamadı.');
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    const userId=session?.user?.id||currentProfile.id;
+    const {error}=await supabaseClient.from('push_subscriptions').upsert({
+      user_id:userId, endpoint, p256dh, auth, updated_at:new Date().toISOString()
+    },{onConflict:'endpoint'});
+    if(error) throw error;
+    return newSub;
   }
   async function initNotificationTargetTest(){
     const card=document.getElementById('notificationAdminCard');
@@ -1644,19 +1673,45 @@ if('serviceWorker' in navigator){
       if(!title||!body){status.textContent='Başlık ve mesajı doldur.';return;}
       if(!ids.length){status.textContent='En az bir alıcı seç.';return;}
       try{
-        status.textContent='📡 Seçilen alıcıların bildirim cihazları kontrol ediliyor…';
+        status.textContent='📡 Bildirim cihazları kontrol ediliyor…';
+
+        // Gönderimi yapmadan hemen önce bu cihazın aboneliğini tekrar
+        // Supabase'e kaydet. Böylece aynı iPhone'da hesap değiştiyse veya
+        // tarayıcı aboneliği daha önceki oturumda kaldıysa hedef kullanıcı
+        // için kayıt yenilenmiş olur.
+        if(currentProfile?.id && ids.some(x=>String(x)===String(currentProfile.id))){
+          try{ await saveCurrentPushSubscription(); }catch(_){ /* gönderim testi yine denensin */ }
+        }
 
         // Edge Function kendi service-role yetkisiyle push_subscriptions
-        // tablosunu okuyor. Bu nedenle burada RLS nedeniyle abonelikleri
-        // doğrudan istemci tarafından okumaya çalışmıyoruz.
-        // Fonksiyonun beklediği alan user_ids.
+        // tablosunu okuyor. Fonksiyonun beklediği alanlar user_ids + message.
         const payload={
           user_ids:ids,
           title,
           message:body
         };
 
-        const {data,error}=await supabaseClient.functions.invoke('send-notification',{body:payload});
+        let {data,error}=await supabaseClient.functions.invoke('send-notification',{body:payload});
+        if(error){
+          const detail=await readFunctionError(error);
+          throw new Error(detail);
+        }
+
+        // Sunucu cihaz kaydı bulamadıysa, bu cihaz seçiliyse aboneliği bir kez
+        // daha zorla yenileyip aynı gönderimi tekrar dene.
+        if(data && Number(data.sent||0)===0 && Number(data.total||0)===0 && currentProfile?.id && ids.some(x=>String(x)===String(currentProfile.id))){
+          try{
+            await forceRefreshCurrentPushSubscription();
+            const retry=await supabaseClient.functions.invoke('send-notification',{body:payload});
+            if(retry.error){
+              const detail=await readFunctionError(retry.error);
+              throw new Error(detail);
+            }
+            data=retry.data;
+          }catch(retryErr){
+            throw retryErr;
+          }
+        }
         if(error){
           const detail=await readFunctionError(error);
           throw new Error(detail);
