@@ -144,7 +144,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 </div><div id="userBar" class="userBar"><span id="currentUserLabel">Oturum açılıyor...</span><button type="button" id="logoutBtn">Çıkış Yap</button></div><div id="branchBar" class="branchBar hidden"><span>🏢 Şube</span><select id="branchSwitcher" aria-label="Aktif şube"></select></div><div class="stats">
 <button class="stat statBtn statTotal" id="statAll"><span class="statLabel">Toplam stok</span><b id="total">0</b></button><button class="stat statBtn stat30" id="stat30"><span class="statLabel">30 gün kalan</span><b id="d30">0</b></button><button class="stat statBtn stat15" id="stat15"><span class="statLabel">15 gün kalan</span><b id="d15">0</b></button><button class="stat statBtn stat5" id="stat5"><span class="statLabel">5 gün kalan</span><b id="d5">0</b></button></div></div></header>
 <div class="container"><nav>
-<button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="categoriesPage">🗂️<br>Kategoriler</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="userAdd" class="adminNav hidden">👤<br>Kullanıcı Ekle</button><button data-page="userManage" class="adminNav hidden">👥<br>Kullanıcı Yönetimi</button><button data-page="branchManage" class="adminNav hidden">🏢<br>Şube Yönetimi</button><button data-page="settings" class="adminNav hidden">⚙️<br>Ayarlar</button></nav>
+<button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="categoriesPage">🗂️<br>Kategoriler</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="userAdd" class="adminNav hidden">👤<br>Kullanıcı Ekle</button><button data-page="userManage" class="adminNav hidden">👥<br>Kullanıcı Yönetimi</button><button data-page="branchManage" class="adminNav hidden">🏢<br>Şube Yönetimi</button><button data-page="settings">🔔<br>Bildirimler</button></nav>
 <section id="home" class="page"><div class="card"><div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div><div id="alerts"></div></div></section>
 <section id="products" class="page hidden"><div class="toolbar"><div class="search"><span>🔎</span><input id="search" placeholder="Ürün ara..."></div><select id="filter"><option value="">Tüm kategoriler</option></select></div><div id="productList"></div></section>
 <section id="add" class="page hidden"><div class="card"><b id="formTitle">Yeni stok kaydı</b>
@@ -173,7 +173,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <div class="card hidden" id="usersListCard"><div class="row"><div><b>👥 Oluşturulan Kullanıcılar</b><div class="muted" style="margin-top:4px">Kullanıcı adı, rol ve şube bilgilerini yönet.</div></div><button class="secondary" id="refreshUsers">↻ Yenile</button></div><div id="userStats" class="grid3" style="margin-top:12px"></div><div id="usersList" style="margin-top:12px"></div></div>
 </section>
 <section id="settings" class="page hidden">
-<div class="card" id="notificationAdminCard" style="margin-top:12px">
+<div class="card hidden" id="notificationAdminCard" style="margin-top:12px">
   <div class="row">
     <div>
       <b>🔔 Bildirim Gönder</b>
@@ -209,7 +209,7 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
   <div id="notificationDeviceStatus" class="productSelectNote" style="margin-top:10px">Bildirim durumu kontrol ediliyor…</div>
   <button class="secondary" type="button" id="notificationDeviceBtn" style="margin-top:10px">🔔 Bildirimleri Etkinleştir</button>
 </div>
-<div class="card" id="adminDataCard" style="margin-top:12px">
+<div class="card hidden" id="adminDataCard" style="margin-top:12px">
   <div class="row">
     <div>
       <b>⚙️ Veri Yönetimi</b>
@@ -776,13 +776,18 @@ function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden')
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
 async function show(page){
   const role=String(currentProfile?.role||'').trim().toLowerCase();
-  const adminPages=['userAdd','userManage','branchManage','settings'];
+  const adminPages=['userAdd','userManage','branchManage'];
   if(adminPages.includes(page) && role!=='admin'){
     toast('Bu bölüm yalnızca Admin yetkisine açıktır.');
     return;
   }
   document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));
   document.querySelectorAll('nav button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  if(page==='settings'){
+    const isAdmin=role==='admin';
+    document.getElementById('notificationAdminCard')?.classList.toggle('hidden',!isAdmin);
+    document.getElementById('adminDataCard')?.classList.toggle('hidden',!isAdmin);
+  }
   if(page==='products')renderProducts();
   if(page==='categoriesPage')renderCategoriesPage();
   if(page==='userAdd'){
@@ -1525,6 +1530,7 @@ if('serviceWorker' in navigator){
     if(!card || initialized && !currentProfile) return;
     const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
     card.classList.toggle('hidden',!isAdmin);
+    document.getElementById('adminDataCard')?.classList.toggle('hidden',!isAdmin);
     if(!isAdmin) return;
     const branchSel=document.getElementById('notifBranch');
     const recipientsBox=document.getElementById('notifRecipients');
@@ -1652,7 +1658,10 @@ if('serviceWorker' in navigator){
     if(currentProfile?.id){
       clearInterval(timer);
       await refreshDeviceNotificationState();
-      if(String(currentProfile?.role||'').trim().toLowerCase()==='admin'&&(branchesCache||[]).length) await initNotificationTargetTest();
+      const isAdmin=String(currentProfile?.role||'').trim().toLowerCase()==='admin';
+      document.getElementById('adminDataCard')?.classList.toggle('hidden',!isAdmin);
+      document.getElementById('notificationAdminCard')?.classList.toggle('hidden',!isAdmin);
+      if(isAdmin&&(branchesCache||[]).length) await initNotificationTargetTest();
     }else if(tries>=40)clearInterval(timer);
   },500);
 })();
