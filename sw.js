@@ -1,8 +1,13 @@
-const CACHE='numnum-skt-v1-5';
+const CACHE='numnum-skt-v2-0';
 
 // GitHub Pages repo yolu
 const APP_URL = new URL('/NumNum-Skt/BarBoss_V19_SKTRenkli.html', self.location.origin).href;
 const NOTIFICATION_URL = APP_URL + '?open=notifications';
+
+const NOTIFICATION_DB='BarBossNotifications';
+const NOTIFICATION_DB_VERSION=1;
+const NOTIFICATION_STORE='items';
+const MAX_NOTIFICATION_HISTORY=100;
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -18,6 +23,54 @@ self.addEventListener('activate', event => {
   );
 });
 
+function openNotificationDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(NOTIFICATION_DB,NOTIFICATION_DB_VERSION);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(NOTIFICATION_STORE)){
+        const store=db.createObjectStore(NOTIFICATION_STORE,{keyPath:'id'});
+        store.createIndex('receivedAt','receivedAt',{unique:false});
+      }
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('Bildirim geçmişi veritabanı açılamadı.'));
+  });
+}
+
+async function saveNotificationHistory(item){
+  try{
+    const db=await openNotificationDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readwrite');
+      tx.objectStore(NOTIFICATION_STORE).put(item);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error||new Error('Bildirim kaydedilemedi.'));
+    });
+
+    // Son 100 bildirimi tut; eski kayıtları temizle.
+    const all=await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readonly');
+      const req=tx.objectStore(NOTIFICATION_STORE).getAll();
+      req.onsuccess=()=>resolve(req.result||[]);
+      req.onerror=()=>reject(req.error);
+    });
+    if(all.length>MAX_NOTIFICATION_HISTORY){
+      all.sort((a,b)=>Number(a.receivedAt||0)-Number(b.receivedAt||0));
+      const remove=all.slice(0,all.length-MAX_NOTIFICATION_HISTORY);
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction(NOTIFICATION_STORE,'readwrite');
+        const store=tx.objectStore(NOTIFICATION_STORE);
+        for(const old of remove) store.delete(old.id);
+        tx.oncomplete=resolve;
+        tx.onerror=()=>reject(tx.error||new Error('Eski bildirimler temizlenemedi.'));
+      });
+    }
+  }catch(_){
+    // Bildirim gösterimi, geçmiş kaydı başarısız olsa bile çalışmaya devam etsin.
+  }
+}
+
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) {
@@ -25,26 +78,43 @@ self.addEventListener('push', event => {
   }
 
   const title = data.title || 'NN BarBoss';
+  const body = data.body || data.message || '';
+  const receivedAt = Date.now();
+  const id = data.id || ('push-' + receivedAt + '-' + Math.random().toString(36).slice(2));
 
-  // Her BarBoss bildirimi uygulamadaki Bildirimler sekmesine gider.
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body: data.body || '',
+  const historyItem={
+    id,
+    title,
+    body,
+    receivedAt,
+    data
+  };
+
+  event.waitUntil((async()=>{
+    await saveNotificationHistory(historyItem);
+
+    const allClients = await clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of allClients){
+      try{ client.postMessage({type:'BARBOSS_NOTIFICATION_SAVED',item:historyItem}); }catch(_){ }
+    }
+
+    await self.registration.showNotification(title, {
+      body,
       icon: data.icon || './icon-192.png',
       badge: data.badge || './icon-192.png',
-      data: { url: NOTIFICATION_URL },
+      data: { url: NOTIFICATION_URL, notificationId:id },
       vibrate: [100, 50, 100],
-      tag: data.tag || 'barboss-notification',
+      tag: data.tag || ('barboss-notification-' + id),
       renotify: true
-    })
-  );
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil((async () => {
-    const target = NOTIFICATION_URL;
+    const target = event.notification?.data?.url || NOTIFICATION_URL;
 
     const allClients = await clients.matchAll({
       type: 'window',

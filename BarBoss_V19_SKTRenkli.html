@@ -212,6 +212,18 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
   <div id="notificationDeviceStatus" class="productSelectNote" style="margin-top:10px">Bildirim durumu kontrol ediliyor…</div>
   <button class="secondary" type="button" id="notificationDeviceBtn" style="margin-top:10px">🔔 Bildirimleri Etkinleştir</button>
 </div>
+<div class="card" id="notificationHistoryCard" style="margin-top:12px">
+  <div class="row">
+    <div>
+      <b>📨 Gelen Bildirimler</b>
+      <div class="muted" style="margin-top:4px">Telefonuna gelen BarBoss bildirimleri burada saklanır.</div>
+    </div>
+    <button class="secondary" type="button" id="notificationHistoryClear">🗑️ Temizle</button>
+  </div>
+  <div id="notificationHistoryList" style="margin-top:12px">
+    <div class="productSelectNote">Bildirimler yükleniyor…</div>
+  </div>
+</div>
 <div class="card hidden" id="adminDataCard" style="margin-top:12px">
   <div class="row">
     <div>
@@ -1487,7 +1499,7 @@ initAuth();
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('./sw.js?v=1.0',{updateViaCache:'none'});
+      const reg=await navigator.serviceWorker.register('./sw.js?v=2.0',{updateViaCache:'none'});
       await reg.update();
     }catch(e){}
   });
@@ -1828,4 +1840,125 @@ if('serviceWorker' in navigator){
   },500);
 })();
 </script>
+
+<script id="barboss-notification-history">
+(function(){
+  const DB_NAME='BarBossNotifications';
+  const DB_VERSION=1;
+  const STORE='items';
+  const MAX_ITEMS=100;
+  let dbPromise=null;
+
+  function openNotificationDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise=new Promise((resolve,reject)=>{
+      if(!('indexedDB' in window)){ reject(new Error('Bu cihaz bildirim geçmişini desteklemiyor.')); return; }
+      const req=indexedDB.open(DB_NAME,DB_VERSION);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(STORE)){
+          const store=db.createObjectStore(STORE,{keyPath:'id'});
+          store.createIndex('receivedAt','receivedAt',{unique:false});
+        }
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('Bildirim geçmişi açılamadı.'));
+    });
+    return dbPromise;
+  }
+
+  async function getHistory(){
+    const db=await openNotificationDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readonly');
+      const req=tx.objectStore(STORE).getAll();
+      req.onsuccess=()=>resolve((req.result||[]).sort((a,b)=>Number(b.receivedAt||0)-Number(a.receivedAt||0)));
+      req.onerror=()=>reject(req.error||new Error('Bildirim geçmişi okunamadı.'));
+    });
+  }
+
+  async function clearHistory(){
+    const db=await openNotificationDB();
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error||new Error('Bildirim geçmişi temizlenemedi.'));
+    });
+  }
+
+  function escapeHtml(v){
+    return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function formatDate(ts){
+    const d=new Date(Number(ts)||Date.now());
+    try{return d.toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(_){return d.toLocaleString();}
+  }
+
+  async function renderNotificationHistory(){
+    const list=document.getElementById('notificationHistoryList');
+    if(!list)return;
+    try{
+      const items=await getHistory();
+      if(!items.length){
+        list.innerHTML='<div class="productSelectNote">📭 Henüz gelen bildirim yok.</div>';
+        return;
+      }
+      list.innerHTML=items.map(item=>`
+        <div style="border:1px solid #d9e0dc;border-radius:14px;background:#fff;padding:13px 14px;margin-bottom:9px;box-shadow:0 2px 8px rgba(0,0,0,.04)">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="font-size:22px;line-height:1">🔔</div>
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:700;color:#26352f;font-size:16px;line-height:1.3">${escapeHtml(item.title||'NN BarBoss')}</div>
+              <div style="margin-top:5px;color:#53635d;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(item.body||'')}</div>
+              <div style="margin-top:8px;color:#82908b;font-size:12px">${formatDate(item.receivedAt)}</div>
+            </div>
+          </div>
+        </div>`).join('');
+    }catch(e){
+      list.innerHTML='<div class="productSelectNote">❌ Bildirim geçmişi okunamadı.</div>';
+    }
+  }
+
+  async function initNotificationHistory(){
+    const clearBtn=document.getElementById('notificationHistoryClear');
+    if(clearBtn && !clearBtn.dataset.bound){
+      clearBtn.dataset.bound='1';
+      clearBtn.onclick=async()=>{
+        if(!confirm('Bildirim geçmişi bu cihazdan silinsin mi?'))return;
+        try{await clearHistory();await renderNotificationHistory();}catch(_){alert('Bildirim geçmişi temizlenemedi.');}
+      };
+    }
+    await renderNotificationHistory();
+  }
+
+  window.BarBossNotificationHistory={render:renderNotificationHistory,init:initNotificationHistory};
+
+  // Bildirimler sekmesi her açıldığında listeyi yenile.
+  function watchSettingsPage(){
+    const settings=document.getElementById('settings');
+    if(!settings)return;
+    initNotificationHistory();
+    const observer=new MutationObserver(()=>{
+      if(!settings.classList.contains('hidden')) renderNotificationHistory();
+    });
+    observer.observe(settings,{attributes:true,attributeFilter:['class']});
+    document.querySelector('nav button[data-page="settings"]')?.addEventListener('click',()=>{
+      setTimeout(renderNotificationHistory,50);
+    });
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',watchSettingsPage,{once:true});
+  else watchSettingsPage();
+
+  // Service worker yeni bir bildirim kaydettiğinde açık ekranı anında yenile.
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message',event=>{
+      if(event.data?.type==='BARBOSS_NOTIFICATION_SAVED') renderNotificationHistory();
+    });
+  }
+})();
+</script>
+
 </body></html>
