@@ -1766,18 +1766,52 @@ if('serviceWorker' in navigator){
   }
   if(deviceBtn){
     deviceBtn.onclick=async()=>{
-      deviceBtn.disabled=true; deviceStatus.textContent='Bildirim izni isteniyor…';
+      deviceBtn.disabled=true; deviceStatus.textContent='Bildirim aboneliği yenileniyor…';
       try{
         if(!currentProfile?.id)throw new Error('Oturum bilgisi bulunamadı.');
         if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window))
           throw new Error('iPhone Web Push için uygulamayı Ana Ekran’a ekleyip oradan açmalısın.');
         const permission=await Notification.requestPermission();
         if(permission!=='granted')throw new Error('Bildirim izni verilmedi.');
-        await saveCurrentPushSubscription();
-        deviceStatus.textContent='✅ Bu cihaz bildirim alıcısı olarak kaydedildi.';
+
+        // VAPID anahtarı değiştiğinde mevcut Apple aboneliği eski anahtara bağlı kalır.
+        // Bu nedenle gerçek bir unsubscribe + yeni subscribe yapıyoruz.
+        const reg=await navigator.serviceWorker.ready;
+        const oldSub=await reg.pushManager.getSubscription();
+        const oldEndpoint=oldSub?.endpoint || null;
+        if(oldSub){
+          try{ await oldSub.unsubscribe(); }catch(_){}
+        }
+
+        const newSub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+        const json=newSub.toJSON();
+        const endpoint=json.endpoint;
+        const p256dh=json.keys?.p256dh;
+        const auth=json.keys?.auth;
+        if(!endpoint||!p256dh||!auth)throw new Error('Yeni push aboneliği anahtarları alınamadı.');
+
+        const {data:{session}}=await supabaseClient.auth.getSession();
+        const userId=session?.user?.id||currentProfile.id;
+        if(!userId)throw new Error('Supabase kullanıcı oturumu bulunamadı.');
+
+        // Eski endpoint'i temizle; böylece eski VAPID aboneliği tekrar gönderimde kullanılmaz.
+        if(oldEndpoint){
+          await supabaseClient.from('push_subscriptions').delete().eq('endpoint',oldEndpoint);
+        }
+
+        const {error}=await supabaseClient.from('push_subscriptions').upsert({
+          user_id:userId, endpoint, p256dh, auth, updated_at:new Date().toISOString()
+        },{onConflict:'endpoint'});
+        if(error)throw error;
+
+        deviceStatus.textContent='✅ Yeni VAPID anahtarıyla bildirim aboneliği yenilendi.';
         deviceBtn.textContent='🔄 Bildirim aboneliğini yenile';
-      }catch(e){deviceStatus.textContent='❌ Bildirim kurulamadı: '+(e.message||e);}
-      finally{deviceBtn.disabled=false;}
+      }catch(e){
+        deviceStatus.textContent='❌ Bildirim aboneliği yenilenemedi: '+(e.message||e);
+      }finally{deviceBtn.disabled=false;}
     };
   }
 
