@@ -145,7 +145,8 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 <button class="stat statBtn statTotal" id="statAll"><span class="statLabel">Toplam stok</span><b id="total">0</b></button><button class="stat statBtn stat30" id="stat30"><span class="statLabel">30 gün kalan</span><b id="d30">0</b></button><button class="stat statBtn stat15" id="stat15"><span class="statLabel">15 gün kalan</span><b id="d15">0</b></button><button class="stat statBtn stat5" id="stat5"><span class="statLabel">5 gün kalan</span><b id="d5">0</b></button></div></div></header>
 <div class="container"><nav>
 <button class="active" data-page="home">🏠<br>Ana Sayfa</button><button data-page="products">📦<br>Stoklar</button><button data-page="categoriesPage">🗂️<br>Kategoriler</button><button data-page="add">➕<br>Ürün Ekle</button><button data-page="userAdd" class="adminNav hidden">👤<br>Kullanıcı Ekle</button><button data-page="userManage" class="adminNav hidden">👥<br>Kullanıcı Yönetimi</button><button data-page="branchManage" class="adminNav hidden">🏢<br>Şube Yönetimi</button><button data-page="settings" class="adminNav hidden">⚙️<br>Ayarlar</button></nav>
-<section id="home" class="page"><div class="card"><div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div><div id="alerts"></div></div></section>
+<section id="home" class="page"><div class="card"><div class="row"><b>SKT Uyarıları</b><span class="muted" id="today"></span></div><div id="alerts"></div></div>
+<div class="card" id="userPushCard" style="margin-top:12px"><div class="row"><div><b>🔔 Bildirimler</b><div class="muted" style="margin-top:4px">SKT ve BarBoss bildirimlerini bu telefonda almak için bir kez etkinleştir.</div></div></div><div class="actions" style="margin-top:10px"><button class="primary" type="button" id="userPushEnableBtn">🔔 Bildirimleri Aç</button></div><div id="userPushStatus" class="muted" style="margin-top:10px"></div></div></section>
 <section id="products" class="page hidden"><div class="toolbar"><div class="search"><span>🔎</span><input id="search" placeholder="Ürün ara..."></div><select id="filter"><option value="">Tüm kategoriler</option></select></div><div id="productList"></div></section>
 <section id="add" class="page hidden"><div class="card"><b id="formTitle">Yeni stok kaydı</b>
 <label>1. Kategori<select id="category"></select></label>
@@ -1609,7 +1610,7 @@ initAuth();
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('./sw.js?v=1.1',{updateViaCache:'none'});
+      const reg=await navigator.serviceWorker.register('./sw.js?v=1.2',{updateViaCache:'none'});
       await reg.update();
     }catch(e){}
   });
@@ -1663,24 +1664,39 @@ if('serviceWorker' in navigator){
     if(!endpoint||!p256dh||!auth) throw new Error('Push abonelik bilgileri alınamadı.');
 
     // Aynı telefon/abonelik daha önce kayıtlıysa güncelle; yoksa ekle.
-    const {data:existing,error:findError}=await supabaseClient
-      .from('push_subscriptions')
-      .select('id')
-      .eq('endpoint',endpoint)
-      .maybeSingle();
-    if(findError) throw findError;
-
-    const payload={user_id:currentProfile.id,endpoint,p256dh,auth};
-    let result;
-    if(existing?.id){
-      result=await supabaseClient.from('push_subscriptions').update(payload).eq('id',existing.id);
-    }else{
-      result=await supabaseClient.from('push_subscriptions').insert(payload);
-    }
+    const payload={user_id:currentProfile.id,endpoint,p256dh,auth,updated_at:new Date().toISOString()};
+    const result=await supabaseClient.from('push_subscriptions').upsert(payload,{onConflict:'endpoint'});
     if(result.error) throw result.error;
 
     status.textContent='✅ Bildirimler aktif. Bu cihaz artık bildirim alabilir.';
     return true;
+  }
+
+  window.enableBarBossPush=async function(statusEl){
+    try{
+      await enablePush(statusEl);
+      return true;
+    }catch(e){
+      if(statusEl) statusEl.textContent='❌ '+(e?.message||e);
+      return false;
+    }
+  };
+
+  function initUserPushCard(){
+    const card=document.getElementById('userPushCard');
+    const btn=document.getElementById('userPushEnableBtn');
+    const status=document.getElementById('userPushStatus');
+    if(!card||!btn||!status)return;
+    if(!currentProfile?.id){card.classList.add('hidden');return;}
+    card.classList.remove('hidden');
+    if('Notification' in window && Notification.permission==='granted') status.textContent='Bildirim izni bu cihazda açık.';
+    btn.onclick=async()=>{
+      btn.disabled=true;
+      btn.textContent='⏳ Etkinleştiriliyor...';
+      const ok=await window.enableBarBossPush(status);
+      btn.disabled=false;
+      btn.textContent=ok?'✅ Bildirimler Açık':'🔔 Bildirimleri Aç';
+    };
   }
 
   async function initNotificationTargetTest(){
@@ -1778,7 +1794,19 @@ if('serviceWorker' in navigator){
           throw new Error(data?.message||data?.error||'Hiçbir cihaza bildirim gönderilemedi.');
         }
         status.textContent=`✅ Gönderildi: ${data.sent||0} · Başarısız: ${data.failed||0} · Toplam abonelik: ${data.total||0}`;
-      }catch(e){status.textContent='❌ Bildirim gönderilemedi: '+(e.message||e);}
+      }catch(e){
+        let detail=e?.message||String(e);
+        try{
+          const ctx=e?.context;
+          if(ctx?.clone){
+            const raw=await ctx.clone().text();
+            if(raw){
+              try{const parsed=JSON.parse(raw);detail=parsed?.error||parsed?.message||raw;}catch(_){detail=raw;}
+            }
+          }
+        }catch(_){}
+        status.textContent='❌ Bildirim gönderilemedi: '+detail;
+      }
     };
 
     renderRecipients();
@@ -1789,10 +1817,14 @@ if('serviceWorker' in navigator){
     window.showApp=async function(){
       const r=await oldShowApp.apply(this,arguments);
       setTimeout(initNotificationTargetTest,250);
+      setTimeout(initUserPushCard,300);
       return r;
     };
   }
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(initNotificationTargetTest,700));
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(initNotificationTargetTest,700);
+    setTimeout(initUserPushCard,750);
+  });
 })();
 </script>
 

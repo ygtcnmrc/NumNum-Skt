@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v1-1';
+const CACHE='numnum-skt-v1-2';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
