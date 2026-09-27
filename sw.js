@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v2-1';
+const CACHE='numnum-skt-v2-2';
 
 // GitHub Pages repo yolu
 const APP_URL = new URL('/NumNum-Skt/BarBoss_V19_SKTRenkli.html', self.location.origin).href;
@@ -166,10 +166,10 @@ self.addEventListener('fetch', event => {
       if(typeof show==='function' &&
          typeof currentProfile!=='undefined' &&
          currentProfile && currentProfile.id){
-        show('settings');
+        show('notifications');
         return true;
       }
-      var btn=document.querySelector('nav button[data-page="settings"]');
+      var btn=document.getElementById('headerNotificationBtn');
       if(btn && typeof currentProfile!=='undefined' &&
          currentProfile && currentProfile.id){
         btn.click();
