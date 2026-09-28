@@ -792,8 +792,10 @@ function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
 const NOTIFICATION_DB_NAME='BarBossNotifications';
-const NOTIFICATION_DB_VERSION=1;
+const NOTIFICATION_DB_VERSION=2;
 const NOTIFICATION_STORE='items';
+const NOTIFICATION_CACHE='barboss-notification-history-v2';
+const NOTIFICATION_CACHE_KEY='/__barboss_notification_history__';
 function openReceivedNotificationsDB(){
   return new Promise((resolve,reject)=>{
     if(!('indexedDB' in window)){reject(new Error('IndexedDB desteklenmiyor'));return;}
@@ -809,18 +811,59 @@ function openReceivedNotificationsDB(){
     req.onerror=()=>reject(req.error||new Error('Bildirim geçmişi açılamadı'));
   });
 }
+async function readNotificationCache(){
+  try{
+    if(!('caches' in window))return [];
+    const cache=await caches.open(NOTIFICATION_CACHE);
+    const res=await cache.match(NOTIFICATION_CACHE_KEY);
+    if(!res)return [];
+    const data=await res.json();
+    return Array.isArray(data)?data:[];
+  }catch(_){return []}
+}
 async function getReceivedNotifications(){
+  let items=[];
   try{
     const db=await openReceivedNotificationsDB();
-    const items=await new Promise((resolve,reject)=>{
+    items=await new Promise((resolve,reject)=>{
       const tx=db.transaction(NOTIFICATION_STORE,'readonly');
       const req=tx.objectStore(NOTIFICATION_STORE).getAll();
       req.onsuccess=()=>resolve(req.result||[]);
       req.onerror=()=>reject(req.error);
     });
     db.close();
-    return items.sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0));
-  }catch(_){return [];}
+  }catch(_){items=[]}
+  const fallback=await readNotificationCache();
+  const merged=new Map();
+  [...fallback,...items].forEach(n=>{
+    if(!n)return;
+    const id=String(n.id||`${n.receivedAt||Date.now()}-${n.title||''}-${n.body||''}`);
+    const prev=merged.get(id);
+    if(!prev || (Number(n.receivedAt)||0)>=(Number(prev.receivedAt)||0)) merged.set(id,{...n,id});
+  });
+  return [...merged.values()].sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0));
+}
+async function saveReceivedNotificationFromPage(n){
+  const item={id:String(n?.id||(`${n?.receivedAt||Date.now()}-${n?.title||''}-${n?.body||''}`)),title:n?.title||'NN BarBoss',body:n?.body||'',receivedAt:Number(n?.receivedAt)||Date.now()};
+  try{
+    const db=await openReceivedNotificationsDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readwrite');
+      tx.objectStore(NOTIFICATION_STORE).put(item);
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+    });
+    db.close();
+  }catch(_){ }
+  try{
+    if('caches' in window){
+      const cache=await caches.open(NOTIFICATION_CACHE);
+      const existing=await readNotificationCache();
+      const m=new Map(existing.map(x=>[String(x.id),x]));
+      m.set(item.id,item);
+      const list=[...m.values()].sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0)).slice(0,100);
+      await cache.put(NOTIFICATION_CACHE_KEY,new Response(JSON.stringify(list),{headers:{'content-type':'application/json'}}));
+    }
+  }catch(_){ }
 }
 async function renderReceivedNotifications(){
   const box=document.getElementById('receivedNotificationsList');
@@ -848,13 +891,15 @@ async function clearReceivedNotifications(){
     });
     db.close();
   }catch(_){ }
+  try{if('caches' in window){const cache=await caches.open(NOTIFICATION_CACHE);await cache.delete(NOTIFICATION_CACHE_KEY);}}catch(_){ }
   await renderReceivedNotifications();
 }
 document.getElementById('clearReceivedNotifications')?.addEventListener('click',clearReceivedNotifications);
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message',event=>{
+  navigator.serviceWorker.addEventListener('message',async event=>{
     if(event.data?.type==='BARBOSS_NOTIFICATION_SAVED'){
-      renderReceivedNotifications();
+      if(event.data.notification) await saveReceivedNotificationFromPage(event.data.notification);
+      await renderReceivedNotifications();
     }
   });
 }
