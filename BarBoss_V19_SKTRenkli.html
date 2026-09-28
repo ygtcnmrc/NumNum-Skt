@@ -848,8 +848,9 @@ async function getReceivedNotifications(){
     db.close();
   }catch(_){items=[]}
   const fallback=await readNotificationCache();
+  const server=await getServerNotificationHistory();
   const merged=new Map();
-  [...fallback,...items].forEach(n=>{
+  [...fallback,...items,...server].forEach(n=>{
     if(!n)return;
     const id=String(n.id||`${n.receivedAt||Date.now()}-${n.title||''}-${n.body||''}`);
     const old=merged.get(id);
@@ -873,6 +874,29 @@ async function saveReceivedNotificationFromPage(n){
   m.set(item.id,item);
   await writeNotificationCache([...m.values()]);
 }
+async function getServerNotificationHistory(){
+  try{
+    if(!supabaseClient || !currentProfile?.id) return [];
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    const userId=session?.user?.id||currentProfile.id;
+    if(!userId) return [];
+    const {data,error}=await supabaseClient.from('notification_history')
+      .select('id,title,body,created_at')
+      .eq('user_id',userId)
+      .order('created_at',{ascending:false})
+      .limit(100);
+    if(error) throw error;
+    return (data||[]).map(n=>({
+      id:String(n.id),
+      title:n.title||'NN BarBoss',
+      body:n.body||'',
+      receivedAt:new Date(n.created_at).getTime()
+    }));
+  }catch(e){
+    return [];
+  }
+}
+
 async function renderReceivedNotifications(){
   const box=document.getElementById('receivedNotificationsList');
   if(!box)return;
@@ -896,6 +920,13 @@ async function clearReceivedNotifications(){
   }catch(_){ }
   try{
     if('caches' in window){const cache=await caches.open(NOTIFICATION_CACHE);await cache.delete(NOTIFICATION_CACHE_KEY);}
+  }catch(_){ }
+  try{
+    if(supabaseClient && currentProfile?.id){
+      const {data:{session}}=await supabaseClient.auth.getSession();
+      const userId=session?.user?.id||currentProfile.id;
+      if(userId) await supabaseClient.from('notification_history').delete().eq('user_id',userId);
+    }
   }catch(_){ }
   await renderReceivedNotifications();
 }
@@ -1624,7 +1655,7 @@ initAuth();
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('./sw.js?v=3.0',{updateViaCache:'none'});
+      const reg=await navigator.serviceWorker.register('./sw.js?v=4.0',{updateViaCache:'none'});
       await reg.update();
     }catch(e){}
   });
