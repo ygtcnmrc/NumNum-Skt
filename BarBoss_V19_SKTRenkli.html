@@ -2122,12 +2122,31 @@ if('serviceWorker' in navigator){
     status.textContent='';
     try{
       if(Notification.permission==='denied'){
-        // Web uygulamalarında işletim sistemi bildirim ayarlarına evrensel bir
-        // deep-link yoktur. Kullanıcıyı kapatılamayan kapıda tutup platforma
-        // özel doğru ayar yolunu gösteriyoruz.
         status.textContent='Bildirimleri cihaz ayarlarından açman gerekiyor.';
         hint.textContent=platformText();
         hint.style.display='block';
+
+        // iOS web/PWA tarafında Apple'ın native UIApplication API'si yoktur.
+        // Yine de iOS'un Settings uygulamasını açmayı deneyelim. Bazı iOS/PWA
+        // sürümlerinde app-settings: çalışır; çalışmazsa kullanıcıya mevcut
+        // manuel yolu göstermeye devam ederiz. Bu deneme mevcut bildirim
+        // aboneliği/Supabase akışına dokunmaz.
+        const ua=navigator.userAgent||'';
+        const isIOS=/iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+        if(isIOS){
+          let returned=false;
+          const onHidden=()=>{ returned=true; document.removeEventListener('visibilitychange',onHidden); };
+          document.addEventListener('visibilitychange',onHidden);
+          try{ window.location.href='app-settings:'; }catch(_){ }
+          setTimeout(()=>{
+            document.removeEventListener('visibilitychange',onHidden);
+            if(!returned){
+              status.textContent='Ayarlar otomatik açılamadı. Aşağıdaki yolu kullan.';
+              hint.textContent=platformText();
+              hint.style.display='block';
+            }
+          },1200);
+        }
         return;
       }
       const permission=await Notification.requestPermission();
