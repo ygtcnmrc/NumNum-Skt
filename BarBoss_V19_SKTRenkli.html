@@ -928,8 +928,37 @@ async function renderReceivedNotifications(){
   box.innerHTML=items.slice(0,50).map(n=>{
     let date='';
     try{date=new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(Number(n.receivedAt)||Date.now()));}catch(_){ }
-    return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee;margin-top:8px"><div class="row"><div><b>${esc(n.title||'BarBoss Bildirimi')}</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(n.body||'')}</div></div><span class="muted" style="font-size:11px">${esc(date)}</span></div></div>`;
+    const id=encodeURIComponent(String(n.id||''));
+    return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee;margin-top:8px"><div class="row" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${esc(n.title||'BarBoss Bildirimi')}</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(n.body||'')}</div></div><div style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span class="muted" style="font-size:11px">${esc(date)}</span><button type="button" class="secondary received-notification-delete" data-notification-id="${id}" aria-label="Bildirimi sil" title="Bildirimi sil" style="padding:6px 9px;min-width:36px">🗑️</button></div></div></div>`;
   }).join('');
+  box.querySelectorAll('.received-notification-delete').forEach(btn=>{
+    btn.addEventListener('click',()=>deleteReceivedNotification(decodeURIComponent(btn.dataset.notificationId||'')));
+  });
+}
+async function deleteReceivedNotification(id){
+  id=String(id||'');
+  if(!id)return;
+  try{
+    const db=await openReceivedNotificationsDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readwrite');
+      tx.objectStore(NOTIFICATION_STORE).delete(id);
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+    });
+    db.close();
+  }catch(_){ }
+  try{
+    const existing=await readNotificationCache();
+    await writeNotificationCache(existing.filter(n=>String(n?.id||'')!==id));
+  }catch(_){ }
+  try{
+    if(supabaseClient && currentProfile?.id){
+      const {data:{session}}=await supabaseClient.auth.getSession();
+      const userId=session?.user?.id||currentProfile.id;
+      if(userId) await supabaseClient.from('notification_history').delete().eq('id',id).eq('user_id',userId);
+    }
+  }catch(_){ }
+  await renderReceivedNotifications();
 }
 async function clearReceivedNotifications(){
   try{
