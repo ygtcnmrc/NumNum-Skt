@@ -1,6 +1,6 @@
 const CACHE='numnum-skt-v5-2';
 
-const APP_URL = new URL('./BarBoss_V19_SKTRenkli.html', self.location.origin).href;
+const APP_URL = new URL('./BarBoss_V19_SKTRenkli.html', self.location.href).href;
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
