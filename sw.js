@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v4-0';
+const CACHE='numnum-skt-v5-0';
 
 const APP_URL = new URL('./BarBoss_V19_SKTRenkli.html', self.location.origin).href;
 
