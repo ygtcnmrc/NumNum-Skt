@@ -111,6 +111,28 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 
 </head>
 <body>
+<style id="mandatory-notification-style">
+#mandatoryNotificationGate{position:fixed;inset:0;z-index:1000000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,38,25,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#mandatoryNotificationGate.show{display:flex}
+.mandatoryNotificationCard{width:min(92vw,430px);background:#fff;border-radius:24px;padding:26px 22px 22px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.mandatoryNotificationIcon{font-size:48px;line-height:1;margin-bottom:12px}
+.mandatoryNotificationCard h2{margin:0 0 10px;font-size:23px;color:#18221e}
+.mandatoryNotificationCard p{margin:0;color:#68756e;font-size:14px;line-height:1.5}
+.mandatoryNotificationBtn{width:100%;margin-top:20px;background:#087b55;color:#fff;border:0;border-radius:13px;padding:14px 16px;font-size:16px;font-weight:800}
+.mandatoryNotificationStatus{margin-top:12px;color:#b91c1c;font-size:12px;line-height:1.45;min-height:18px}
+.mandatoryNotificationHint{margin-top:10px;color:#68756e;font-size:11px;line-height:1.45;display:none}
+</style>
+<div id="mandatoryNotificationGate" aria-modal="true" role="dialog">
+  <div class="mandatoryNotificationCard">
+    <div class="mandatoryNotificationIcon">🔔</div>
+    <h2>Bildirimleri Etkinleştir</h2>
+    <p>BarBoss'u kullanabilmek ve SKT, stok ve yöneticilerden gelen önemli bildirimleri alabilmek için bu cihazda bildirimleri etkinleştirmen gerekiyor.</p>
+    <button id="mandatoryNotificationBtn" class="mandatoryNotificationBtn" type="button">🔔 Bildirimleri Etkinleştir</button>
+    <div id="mandatoryNotificationStatus" class="mandatoryNotificationStatus"></div>
+    <div id="mandatoryNotificationHint" class="mandatoryNotificationHint"></div>
+  </div>
+</div>
+
 
 <div id="nnbWelcome" aria-hidden="true">
   <div class="nnbWelcomeCard">
@@ -2034,6 +2056,115 @@ if('serviceWorker' in navigator){
       if(isAdmin) await initNotificationTargetTest();
     }else if(tries>=40)clearInterval(timer);
   },500);
+})();
+</script>
+
+<script id="mandatory-notification-gate-script">
+(function(){
+  const gate=document.getElementById('mandatoryNotificationGate');
+  const btn=document.getElementById('mandatoryNotificationBtn');
+  const status=document.getElementById('mandatoryNotificationStatus');
+  const hint=document.getElementById('mandatoryNotificationHint');
+  if(!gate||!btn)return;
+  let checking=false;
+
+  function showGate(){ gate.classList.add('show'); document.body.style.overflow='hidden'; }
+  function hideGate(){ gate.classList.remove('show'); document.body.style.overflow=''; }
+  function isSupported(){ return ('Notification' in window)&&('serviceWorker' in navigator)&&('PushManager' in window); }
+  function platformText(){
+    const ua=navigator.userAgent||'';
+    if(/Android/i.test(ua)) return 'Android: Ayarlar > Uygulamalar > NN BarBoss > Bildirimler bölümünden bildirimleri açıp BarBoss’a geri dön.';
+    if(/iPhone|iPad|iPod/i.test(ua)) return 'iPhone/iPad: Ayarlar > Bildirimler > NN BarBoss bölümünden Bildirimlere İzin Ver seçeneğini açıp BarBoss’a geri dön.';
+    return 'Cihazının bildirim ayarlarından NN BarBoss bildirimlerini açıp BarBoss’a geri dön.';
+  }
+  async function hasReadySubscription(){
+    try{
+      if(Notification.permission!=='granted') return false;
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      return !!sub;
+    }catch(_){ return false; }
+  }
+  async function checkGate(){
+    if(checking)return;
+    checking=true;
+    try{
+      if(typeof currentProfile==='undefined'||!currentProfile?.id){ hideGate(); return; }
+      if(!isSupported()){
+        showGate();
+        btn.disabled=true;
+        status.textContent='Bu cihazda web bildirimleri desteklenmiyor.';
+        return;
+      }
+      const ready=await hasReadySubscription();
+      if(ready){
+        hideGate();
+        return;
+      }
+      showGate();
+      btn.disabled=false;
+      if(Notification.permission==='denied'){
+        btn.textContent='⚙️ Bildirim Ayarlarını Aç';
+        status.textContent='Bildirim izni daha önce kapatılmış.';
+        hint.textContent=platformText();
+        hint.style.display='block';
+      }else{
+        btn.textContent='🔔 Bildirimleri Etkinleştir';
+        status.textContent='';
+        hint.style.display='none';
+      }
+    }finally{ checking=false; }
+  }
+
+  btn.addEventListener('click',async function(){
+    if(checking)return;
+    btn.disabled=true;
+    status.textContent='';
+    try{
+      if(Notification.permission==='denied'){
+        // Web uygulamalarında işletim sistemi bildirim ayarlarına evrensel bir
+        // deep-link yoktur. Kullanıcıyı kapatılamayan kapıda tutup platforma
+        // özel doğru ayar yolunu gösteriyoruz.
+        status.textContent='Bildirimleri cihaz ayarlarından açman gerekiyor.';
+        hint.textContent=platformText();
+        hint.style.display='block';
+        return;
+      }
+      const permission=await Notification.requestPermission();
+      if(permission!=='granted'){
+        status.textContent='Bildirim izni verilmeden uygulama açılamaz.';
+        return;
+      }
+      if(window.BarBossNotifications?.saveCurrentPushSubscription){
+        await window.BarBossNotifications.saveCurrentPushSubscription();
+      }else{
+        throw new Error('Bildirim aboneliği hazır değil.');
+      }
+      const ready=await hasReadySubscription();
+      if(!ready)throw new Error('Bu cihaz için bildirim aboneliği oluşturulamadı.');
+      hideGate();
+    }catch(e){
+      status.textContent=e?.message||'Bildirim kurulamadı.';
+    }finally{
+      btn.disabled=false;
+    }
+  });
+
+  // Login tamamlandıktan sonra currentProfile oluşunca kontrol et.
+  let tries=0;
+  const timer=setInterval(async()=>{
+    tries++;
+    if(typeof currentProfile!=='undefined'&&currentProfile?.id){
+      clearInterval(timer);
+      await checkGate();
+    }else if(tries>80){
+      clearInterval(timer);
+    }
+  },500);
+
+  // Ayarlardan izin verip uygulamaya geri dönüldüğünde tekrar kontrol et.
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) setTimeout(checkGate,500); });
+  window.addEventListener('focus',()=>setTimeout(checkGate,500));
 })();
 </script>
 </body></html>
