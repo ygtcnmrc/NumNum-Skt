@@ -773,24 +773,17 @@ Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categor
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
 const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 function days(p){
-  const s=String(p.expiry||'');
-  const m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
-  if(!m)return 99999;
-  const y=Number(m[1]), mo=Number(m[2]), d=Number(m[3]);
+  const parts=String(p.expiry||'').split('-').map(Number);
+  if(parts.length!==3||parts.some(Number.isNaN)) return 99999;
+  const [y,m,d]=parts;
   const now=new Date();
-  const todayUTC=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
-  const expiryUTC=Date.UTC(y,mo-1,d);
-  return Math.round((expiryUTC-todayUTC)/86400000);
-}
-function expiryLabel(p){
-  const d=days(p);
-  if(d<0)return d+' gün';
-  if(d===0)return 'Son gün';
-  return (d+1)+' gün';
+  const today=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
+  const expiry=Date.UTC(y,m-1,d);
+  return Math.round((expiry-today)/86400000);
 }
 function level(p){
   const d=days(p);
-  const label=expiryLabel(p);
+  const label=d<0 ? d+' gün' : (d===0 ? 'Son gün' : (d+1)+' gün');
   if(d<0)return ['danger',label];
   if(d<=5)return ['danger',label];
   if(d<=15)return ['warn',label];
