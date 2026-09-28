@@ -1837,12 +1837,28 @@ if('serviceWorker' in navigator){
     }
     function groupHtml(title,icon,list){
       if(!list.length)return '';
-      return `<div style="border-bottom:1px solid #e8eeeb"><div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f6f9f7;font-weight:700">${icon} ${escN(title)} <span class="muted">(${list.length})</span></div>${list.map(recipientRow).join('')}</div>`;
+      const groupId='notifGroup_'+Math.random().toString(36).slice(2,10);
+      return `<div style="border-bottom:1px solid #e8eeeb">
+        <button type="button" class="notif-group-toggle" aria-expanded="false" aria-controls="${groupId}" style="width:100%;border:0;border-radius:0;display:flex;align-items:center;gap:8px;padding:12px 14px;background:#f6f9f7;font-weight:700;font-size:15px;color:#25332d;text-align:left;cursor:pointer">
+          <span class="notif-group-arrow" style="width:18px;display:inline-block;text-align:center">▶</span>
+          <span>${icon} ${escN(title)}</span> <span class="muted">(${list.length})</span>
+        </button>
+        <div id="${groupId}" class="notif-group-body" style="display:none">${list.map(recipientRow).join('')}</div>
+      </div>`;
     }
     function renderRecipients(){
       const branchId=branchSel.value;
       const list=branchId==='all'?users:users.filter(u=>{const k=roleKey(u);return k==='admin'||k==='manager'||String(u.branch_id)===String(branchId);});
       recipientsBox.innerHTML=list.length?groupHtml('Adminler','👑',list.filter(u=>roleKey(u)==='admin'))+groupHtml('Yöneticiler','🛡️',list.filter(u=>roleKey(u)==='manager'))+groupHtml('Kullanıcılar','👥',list.filter(u=>roleKey(u)==='user')):'<div style="padding:14px;color:#6b7b74">Bu hedef için aktif alıcı bulunamadı.</div>';
+      recipientsBox.querySelectorAll('.notif-group-toggle').forEach(btn=>btn.addEventListener('click',()=>{
+        const body=document.getElementById(btn.getAttribute('aria-controls'));
+        if(!body)return;
+        const open=btn.getAttribute('aria-expanded')==='true';
+        btn.setAttribute('aria-expanded',String(!open));
+        body.style.display=open?'none':'block';
+        const arrow=btn.querySelector('.notif-group-arrow');
+        if(arrow)arrow.textContent=open?'▶':'▼';
+      }));
       recipientsBox.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',updateSummary)); updateSummary();
     }
     branchSel.onchange=renderRecipients;
@@ -2036,245 +2052,4 @@ if('serviceWorker' in navigator){
   },500);
 })();
 </script>
-
-<!-- BarBoss mandatory notification permission gate -->
-<style id="barboss-notification-gate-style">
-#barbossNotificationGate{
-  position:fixed;inset:0;z-index:2147483000;
-  display:none;align-items:center;justify-content:center;
-  padding:18px;background:rgba(0,38,25,.82);
-  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
-}
-#barbossNotificationGate.show{display:flex}
-#barbossNotificationGate .gateBox{
-  width:min(92vw,520px);background:#fff;border-radius:28px;
-  padding:28px 22px 24px;text-align:center;
-  box-shadow:0 24px 80px rgba(0,0,0,.35);
-}
-#barbossNotificationGate .gateIcon{font-size:58px;line-height:1;margin-bottom:10px}
-#barbossNotificationGate h2{margin:0 0 14px;font-size:28px;color:#18221e}
-#barbossNotificationGate p{margin:0 auto 18px;max-width:430px;color:#68756e;font-size:16px;line-height:1.45}
-#barbossNotificationGate .gateBtn{
-  width:100%;border:0;border-radius:14px;padding:15px 16px;
-  background:#087b55;color:#fff;font-weight:800;font-size:16px;
-}
-#barbossNotificationGate .gateBtn:active{transform:scale(.99)}
-#barbossNotificationGate .gateStatus{
-  margin-top:13px;color:#b91c1c;font-weight:700;font-size:13px;line-height:1.45;
-}
-#barbossNotificationGate .gateHelp{
-  display:none;margin-top:14px;padding:12px;border-radius:12px;
-  background:#eef8f4;color:#356253;text-align:left;font-size:12px;line-height:1.55;
-}
-#barbossNotificationGate .gateHelp.show{display:block}
-#barbossNotificationGate .gateHelp b{color:#075a3e}
-</style>
-
-<div id="barbossNotificationGate" aria-hidden="true">
-  <div class="gateBox" role="dialog" aria-modal="true" aria-labelledby="barbossNotificationGateTitle">
-    <div class="gateIcon">🔔</div>
-    <h2 id="barbossNotificationGateTitle">Bildirimleri Etkinleştir</h2>
-    <p>BarBoss'u kullanabilmek ve SKT, stok ve yöneticilerden gelen önemli bildirimleri alabilmek için bu cihazda bildirimleri etkinleştirmen gerekiyor.</p>
-    <button type="button" class="gateBtn" id="barbossNotificationGateBtn">🔔 Bildirimleri Etkinleştir</button>
-    <div class="gateStatus" id="barbossNotificationGateStatus"></div>
-    <div class="gateHelp" id="barbossNotificationGateHelp"></div>
-  </div>
-</div>
-
-<script>
-(function(){
-  'use strict';
-
-  const gate=document.getElementById('barbossNotificationGate');
-  const btn=document.getElementById('barbossNotificationGateBtn');
-  const status=document.getElementById('barbossNotificationGateStatus');
-  const help=document.getElementById('barbossNotificationGateHelp');
-  if(!gate||!btn)return;
-
-  let gateBusy=false;
-
-  function isIOS(){
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-  }
-  function isAndroid(){ return /Android/i.test(navigator.userAgent); }
-  function standalone(){
-    return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone===true;
-  }
-
-  function setHelp(message){
-    help.innerHTML=message;
-    help.classList.add('show');
-  }
-
-  function showGate(){
-    gate.classList.add('show');
-    gate.setAttribute('aria-hidden','false');
-    document.body.style.overflow='hidden';
-  }
-  function hideGate(){
-    gate.classList.remove('show');
-    gate.setAttribute('aria-hidden','true');
-    document.body.style.overflow='';
-  }
-
-  function notificationSupported(){
-    return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
-  }
-
-  async function refreshGate(){
-    // Login screen is handled separately. Never show the gate before a user session exists.
-    if(typeof currentProfile==='undefined' || !currentProfile?.id)return;
-
-    if(!notificationSupported()){
-      showGate();
-      btn.disabled=true;
-      btn.textContent='🔔 Bildirimler desteklenmiyor';
-      status.textContent='';
-      setHelp('Bu cihaz Web Push bildirimlerini desteklemiyor. iPhone/iPad kullanıyorsan BarBoss\'u Ana Ekran\'a ekleyip uygulama olarak açmalısın.');
-      return;
-    }
-
-    if(Notification.permission==='granted'){
-      hideGate();
-      btn.disabled=false;
-      status.textContent='';
-      help.classList.remove('show');
-      return;
-    }
-
-    // "default" and "denied" both block app usage until the permission is granted.
-    showGate();
-    btn.disabled=false;
-
-    if(Notification.permission==='denied'){
-      btn.textContent=isIOS() ? '⚙️ Bildirim Ayarlarını Aç' : '⚙️ Bildirim Ayarlarını Aç';
-      status.textContent='Devam etmek için bildirim iznini vermelisin.';
-      if(isIOS()){
-        setHelp('<b>iPhone/iPad:</b> Ayarlar → Bildirimler → <b>NN BarBoss</b> → Bildirimlere İzin Ver.<br><br>iOS web uygulamalarında web sayfasından Ayarlar uygulamasına güvenilir bir doğrudan geçiş yapılamaz. Bu nedenle BarBoss yanlış bir Safari sayfası açmaya çalışmayacak; Ayarlar\'ı sen açıp izni verdikten sonra BarBoss\'a geri dönebilirsin.');
-      }else if(isAndroid()){
-        setHelp('<b>Android:</b> Ayarlar → Uygulamalar → <b>NN BarBoss</b> → Bildirimler → Bildirimlere izin ver.<br><br>Ayarlar açılırsa BarBoss\'a geri dönüp devam edebilirsin.');
-      }else{
-        setHelp('Cihazın Ayarlar uygulamasından NN BarBoss için bildirim iznini açıp BarBoss\'a geri dön.');
-      }
-    }else{
-      btn.textContent='🔔 Bildirimleri Etkinleştir';
-      status.textContent='Devam etmek için bildirim iznini vermelisin.';
-      help.classList.remove('show');
-    }
-  }
-
-  async function saveSubscriptionIfAvailable(){
-    try{
-      if(window.BarBossNotifications?.saveCurrentPushSubscription){
-        await window.BarBossNotifications.saveCurrentPushSubscription();
-        return true;
-      }
-    }catch(_){}
-    try{
-      if(typeof saveCurrentPushSubscription==='function'){
-        await saveCurrentPushSubscription();
-        return true;
-      }
-    }catch(_){}
-    return false;
-  }
-
-  function openSettingsWithoutLeavingPage(){
-    const ios=isIOS();
-    const android=isAndroid();
-
-    // Do not navigate the main window to app-settings:/prefs:.
-    // Safari can treat those schemes as invalid web addresses. A hidden iframe
-    // gives the OS a chance to handle a custom scheme without replacing BarBoss.
-    try{
-      const frame=document.createElement('iframe');
-      frame.style.cssText='position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0;opacity:0';
-      frame.setAttribute('aria-hidden','true');
-      document.body.appendChild(frame);
-
-      if(ios){
-        frame.src='app-settings:';
-      }else if(android){
-        frame.src='intent:#Intent;action=android.settings.SETTINGS;end';
-      }
-
-      setTimeout(()=>{try{frame.remove();}catch(_){}},1800);
-    }catch(_){}
-
-    if(ios){
-      setHelp('<b>iPhone/iPad:</b> Ayarlar → Bildirimler → <b>NN BarBoss</b> → Bildirimlere İzin Ver.<br><br>Ayarlar\'dan izni açtıktan sonra BarBoss\'a geri dön. Ekran otomatik olarak kapanacaktır.');
-    }else if(android){
-      setHelp('<b>Android:</b> Ayarlar → Uygulamalar → <b>NN BarBoss</b> → Bildirimler → Bildirimlere izin ver.<br><br>İzni açtıktan sonra BarBoss\'a geri dön.');
-    }else{
-      setHelp('Cihaz Ayarları → Uygulamalar → NN BarBoss → Bildirimler bölümünden bildirimleri açıp BarBoss\'a geri dön.');
-    }
-  }
-
-  btn.addEventListener('click', async function(){
-    if(gateBusy)return;
-    gateBusy=true;
-    btn.disabled=true;
-
-    try{
-      if(!notificationSupported()){
-        status.textContent='Bu cihazda Web Push bildirimleri kullanılamıyor.';
-        return;
-      }
-
-      if(Notification.permission==='denied'){
-        openSettingsWithoutLeavingPage();
-        status.textContent='Bildirim izni daha önce kapatılmış.';
-        return;
-      }
-
-      status.textContent='Bildirim izni isteniyor…';
-      const permission=await Notification.requestPermission();
-
-      if(permission!=='granted'){
-        status.textContent='Devam etmek için bildirim iznini vermelisin.';
-        if(permission==='denied'){
-          btn.textContent='⚙️ Bildirim Ayarlarını Aç';
-          openSettingsWithoutLeavingPage();
-        }
-        return;
-      }
-
-      status.textContent='Bildirim aboneliği hazırlanıyor…';
-      await saveSubscriptionIfAvailable();
-      hideGate();
-    }catch(e){
-      status.textContent='Bildirim kurulamadı: '+(e?.message||e);
-    }finally{
-      gateBusy=false;
-      btn.disabled=false;
-      if(Notification.permission==='granted'){
-        hideGate();
-      }
-    }
-  });
-
-  function recheck(){
-    setTimeout(refreshGate,250);
-  }
-  document.addEventListener('visibilitychange',recheck);
-  window.addEventListener('focus',recheck);
-  window.addEventListener('pageshow',recheck);
-  setInterval(refreshGate,2000);
-
-  // currentProfile is populated after login; wait for it.
-  let tries=0;
-  const bootTimer=setInterval(()=>{
-    tries++;
-    if(typeof currentProfile!=='undefined' && currentProfile?.id){
-      clearInterval(bootTimer);
-      refreshGate();
-    }else if(tries>60){
-      clearInterval(bootTimer);
-    }
-  },500);
-})();
-</script>
-
 </body></html>
