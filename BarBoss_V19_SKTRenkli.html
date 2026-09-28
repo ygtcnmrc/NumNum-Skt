@@ -109,30 +109,42 @@ input,select{width:100%;padding:12px;border:1px solid #d9e0dc;border-radius:11px
 }
 </style>
 
+
+<style id="barboss-notification-gate-style">
+#barbossNotificationGate{
+  position:fixed;inset:0;z-index:200000;display:none;align-items:center;justify-content:center;
+  padding:18px;background:rgba(3,38,25,.82);backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);box-sizing:border-box;
+}
+#barbossNotificationGate.show{display:flex}
+.barbossNotificationGateBox{
+  width:min(92vw,560px);max-height:90vh;overflow:auto;background:#fff;border-radius:26px;
+  padding:26px 22px 22px;box-shadow:0 24px 80px rgba(0,0,0,.34);text-align:center;
+  box-sizing:border-box;
+}
+.barbossNotificationGateBell{font-size:58px;line-height:1;margin-bottom:10px}
+.barbossNotificationGateTitle{font-size:28px;font-weight:900;color:#26322d;margin:0 0 12px}
+.barbossNotificationGateText{font-size:17px;line-height:1.5;color:#66736d;margin:0 auto 16px;max-width:500px}
+.barbossNotificationGateButton{
+  width:100%;border:0;border-radius:15px;padding:15px 18px;background:#15965f;color:#fff;
+  font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 8px 18px rgba(21,150,95,.22);
+}
+.barbossNotificationGateButton:disabled{opacity:.55;cursor:default;box-shadow:none}
+.barbossNotificationGateStatus{min-height:24px;margin-top:13px;font-size:14px;line-height:1.45;color:#a52a2a;font-weight:700}
+.barbossNotificationGateSteps{display:none;text-align:left;margin-top:14px;padding:14px 16px;border-radius:15px;background:#f3f8f5;color:#4d5b54;font-size:14px;line-height:1.6}
+.barbossNotificationGateSteps.show{display:block}
+.barbossNotificationGateSteps b{color:#176b49}
+.barbossNotificationGateHint{font-size:12px;color:#7b8781;margin-top:13px}
+@media(max-width:520px){
+  .barbossNotificationGateBox{width:min(94vw,430px);padding:23px 17px 18px;border-radius:23px}
+  .barbossNotificationGateBell{font-size:52px}
+  .barbossNotificationGateTitle{font-size:25px}
+  .barbossNotificationGateText{font-size:16px}
+}
+</style>
+
 </head>
 <body>
-<style id="mandatory-notification-style">
-#mandatoryNotificationGate{position:fixed;inset:0;z-index:1000000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(3,38,25,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-#mandatoryNotificationGate.show{display:flex}
-.mandatoryNotificationCard{width:min(92vw,430px);background:#fff;border-radius:24px;padding:26px 22px 22px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35)}
-.mandatoryNotificationIcon{font-size:48px;line-height:1;margin-bottom:12px}
-.mandatoryNotificationCard h2{margin:0 0 10px;font-size:23px;color:#18221e}
-.mandatoryNotificationCard p{margin:0;color:#68756e;font-size:14px;line-height:1.5}
-.mandatoryNotificationBtn{width:100%;margin-top:20px;background:#087b55;color:#fff;border:0;border-radius:13px;padding:14px 16px;font-size:16px;font-weight:800}
-.mandatoryNotificationStatus{margin-top:12px;color:#b91c1c;font-size:12px;line-height:1.45;min-height:18px}
-.mandatoryNotificationHint{margin-top:10px;color:#68756e;font-size:11px;line-height:1.45;display:none}
-</style>
-<div id="mandatoryNotificationGate" aria-modal="true" role="dialog">
-  <div class="mandatoryNotificationCard">
-    <div class="mandatoryNotificationIcon">🔔</div>
-    <h2>Bildirimleri Etkinleştir</h2>
-    <p>BarBoss'u kullanabilmek ve SKT, stok ve yöneticilerden gelen önemli bildirimleri alabilmek için bu cihazda bildirimleri etkinleştirmen gerekiyor.</p>
-    <button id="mandatoryNotificationBtn" class="mandatoryNotificationBtn" type="button">🔔 Bildirimleri Etkinleştir</button>
-    <div id="mandatoryNotificationStatus" class="mandatoryNotificationStatus"></div>
-    <div id="mandatoryNotificationHint" class="mandatoryNotificationHint"></div>
-  </div>
-</div>
-
 
 <div id="nnbWelcome" aria-hidden="true">
   <div class="nnbWelcomeCard">
@@ -438,6 +450,7 @@ async function showApp(){
   // Her açılışta Supabase'deki güncel global kataloğu yeniden çek.
   // Böylece daha önce localStorage'a kalmış eski V8 kataloğu ekranda kalmaz.
   if(currentProfile?.id) await syncCatalogFromSupabase();
+  await enforceBarbossNotificationGate();
 }
 async function loadBranchSwitcher(){
   const bar=document.getElementById('branchBar');
@@ -481,6 +494,7 @@ async function logout(){
   stopStockRealtime();
   await supabaseClient.auth.signOut();
   currentProfile=null;
+  showBarbossNotificationGate(false);
   selectedBranchId=null;
   sessionStorage.removeItem(APP_AUTH_KEY);
   sessionStorage.removeItem('barskt_selected_branch');
@@ -610,6 +624,157 @@ async function handleNotificationDeepLink(){
       }
     }catch(_){}
   }
+}
+
+// ================= ZORUNLU BİLDİRİM İZNİ =================
+let barbossNotificationGateBound=false;
+let barbossNotificationGateBusy=false;
+
+function barbossIsStandaloneIOS(){
+  return !!(window.navigator.standalone===true || window.matchMedia?.('(display-mode: standalone)').matches);
+}
+
+function barbossNotificationSupported(){
+  return ('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window);
+}
+
+function showBarbossNotificationGate(show=true){
+  const gate=document.getElementById('barbossNotificationGate');
+  if(!gate)return;
+  gate.classList.toggle('show',show);
+  gate.setAttribute('aria-hidden',show?'false':'true');
+  document.body.style.overflow=show?'hidden':'';
+}
+
+function setBarbossNotificationGateStatus(message='',error=true){
+  const el=document.getElementById('barbossNotificationGateStatus');
+  if(!el)return;
+  el.textContent=message;
+  el.style.color=error?'#a52a2a':'#176b49';
+}
+
+function showBarbossNotificationSettingsHelp(){
+  const steps=document.getElementById('barbossNotificationGateSteps');
+  if(steps)steps.classList.add('show');
+  setBarbossNotificationGateStatus('Bildirim ayarlarını cihazın kendi Ayarlar uygulamasından açman gerekiyor.',true);
+}
+
+function updateBarbossNotificationGateButton(permission){
+  const btn=document.getElementById('barbossNotificationGateButton');
+  const steps=document.getElementById('barbossNotificationGateSteps');
+  if(!btn)return;
+  if(permission==='denied'){
+    btn.textContent='⚙️ Bildirim Ayarlarını Aç';
+    if(steps)steps.classList.add('show');
+  }else{
+    btn.textContent='🔔 Bildirimleri Etkinleştir';
+    if(steps)steps.classList.remove('show');
+  }
+}
+
+async function refreshBarbossNotificationGate(){
+  const gate=document.getElementById('barbossNotificationGate');
+  const btn=document.getElementById('barbossNotificationGateButton');
+  if(!gate||!btn||!currentProfile?.id)return;
+
+  if(!barbossNotificationSupported()){
+    showBarbossNotificationGate(true);
+    btn.disabled=true;
+    btn.textContent='🔔 Bildirim Desteği Bulunamadı';
+    const text=document.getElementById('barbossNotificationGateText');
+    if(text){
+      text.textContent=barbossIsStandaloneIOS()
+        ? 'Bu cihazda web bildirimleri kullanılamıyor. Lütfen uygulamayı Ana Ekran’a ekleyip oradan aç.'
+        : 'Bu cihaz veya tarayıcı BarBoss bildirimlerini desteklemiyor.';
+    }
+    setBarbossNotificationGateStatus('Bildirimler desteklenmeden BarBoss kullanılamaz.',true);
+    return false;
+  }
+
+  const permission=Notification.permission;
+  updateBarbossNotificationGateButton(permission);
+
+  if(permission==='granted'){
+    try{
+      btn.disabled=true;
+      setBarbossNotificationGateStatus('Bildirim aboneliği kontrol ediliyor…',false);
+      const saver=window.BarBossNotifications?.saveCurrentPushSubscription;
+      if(typeof saver!=='function') throw new Error('Bildirim servisi henüz hazır değil.');
+      await saver();
+      btn.disabled=false;
+      setBarbossNotificationGateStatus('',false);
+      showBarbossNotificationGate(false);
+      return true;
+    }catch(e){
+      btn.disabled=false;
+      showBarbossNotificationGate(true);
+      setBarbossNotificationGateStatus('Bildirim aboneliği kaydedilemedi: '+(e?.message||e),true);
+      return false;
+    }
+  }
+
+  showBarbossNotificationGate(true);
+  btn.disabled=false;
+  if(permission==='denied'){
+    setBarbossNotificationGateStatus('Bildirim izni daha önce kapatılmış. Aşağıdaki cihaz ayarlarından açıp BarBoss’a geri dön.',true);
+  }else{
+    setBarbossNotificationGateStatus('Devam etmek için bildirim iznini vermelisin.',true);
+  }
+  return false;
+}
+
+async function requestBarbossNotificationPermission(){
+  const btn=document.getElementById('barbossNotificationGateButton');
+  if(!btn||barbossNotificationGateBusy)return;
+  if(!barbossNotificationSupported()){await refreshBarbossNotificationGate();return;}
+
+  if(Notification.permission==='denied'){
+    // Web uygulamaları iOS/Android sistem bildirim ayarlarını güvenilir biçimde
+    // doğrudan açamaz. Geçersiz app-settings:// URL'sine gitmek yerine doğru yolu göster.
+    showBarbossNotificationSettingsHelp();
+    return;
+  }
+
+  barbossNotificationGateBusy=true;
+  btn.disabled=true;
+  setBarbossNotificationGateStatus('Bildirim izni isteniyor…',false);
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission==='granted'){
+      const saver=window.BarBossNotifications?.saveCurrentPushSubscription;
+      if(typeof saver!=='function') throw new Error('Bildirim servisi henüz hazır değil.');
+      await saver();
+      setBarbossNotificationGateStatus('',false);
+      showBarbossNotificationGate(false);
+    }else if(permission==='denied'){
+      updateBarbossNotificationGateButton('denied');
+      setBarbossNotificationGateStatus('Bildirim izni kapatıldı. Cihaz ayarlarından BarBoss bildirimlerini açmalısın.',true);
+      showBarbossNotificationSettingsHelp();
+    }else{
+      setBarbossNotificationGateStatus('İzin verilmeden BarBoss açılamaz.',true);
+    }
+  }catch(e){
+    setBarbossNotificationGateStatus('Bildirim kurulamadı: '+(e?.message||e),true);
+  }finally{
+    barbossNotificationGateBusy=false;
+    btn.disabled=false;
+  }
+}
+
+function bindBarbossNotificationGate(){
+  if(barbossNotificationGateBound)return;
+  const btn=document.getElementById('barbossNotificationGateButton');
+  if(!btn)return;
+  barbossNotificationGateBound=true;
+  btn.addEventListener('click',requestBarbossNotificationPermission);
+  const recheck=()=>{ if(currentProfile?.id) refreshBarbossNotificationGate(); };
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')recheck();});
+  window.addEventListener('pageshow',recheck);
+}
+
+async function enforceBarbossNotificationGate(){
+  bindBarbossNotificationGate();
+  return refreshBarbossNotificationGate();
 }
 
 async function initAuth(){
@@ -2056,134 +2221,6 @@ if('serviceWorker' in navigator){
       if(isAdmin) await initNotificationTargetTest();
     }else if(tries>=40)clearInterval(timer);
   },500);
-})();
-</script>
-
-<script id="mandatory-notification-gate-script">
-(function(){
-  const gate=document.getElementById('mandatoryNotificationGate');
-  const btn=document.getElementById('mandatoryNotificationBtn');
-  const status=document.getElementById('mandatoryNotificationStatus');
-  const hint=document.getElementById('mandatoryNotificationHint');
-  if(!gate||!btn)return;
-  let checking=false;
-
-  function showGate(){ gate.classList.add('show'); document.body.style.overflow='hidden'; }
-  function hideGate(){ gate.classList.remove('show'); document.body.style.overflow=''; }
-  function isSupported(){ return ('Notification' in window)&&('serviceWorker' in navigator)&&('PushManager' in window); }
-  function platformText(){
-    const ua=navigator.userAgent||'';
-    if(/Android/i.test(ua)) return 'Android: Ayarlar > Uygulamalar > NN BarBoss > Bildirimler bölümünden bildirimleri açıp BarBoss’a geri dön.';
-    if(/iPhone|iPad|iPod/i.test(ua)) return 'iPhone/iPad: Ayarlar > Bildirimler > NN BarBoss bölümünden Bildirimlere İzin Ver seçeneğini açıp BarBoss’a geri dön.';
-    return 'Cihazının bildirim ayarlarından NN BarBoss bildirimlerini açıp BarBoss’a geri dön.';
-  }
-  async function hasReadySubscription(){
-    try{
-      if(Notification.permission!=='granted') return false;
-      const reg=await navigator.serviceWorker.ready;
-      const sub=await reg.pushManager.getSubscription();
-      return !!sub;
-    }catch(_){ return false; }
-  }
-  async function checkGate(){
-    if(checking)return;
-    checking=true;
-    try{
-      if(typeof currentProfile==='undefined'||!currentProfile?.id){ hideGate(); return; }
-      if(!isSupported()){
-        showGate();
-        btn.disabled=true;
-        status.textContent='Bu cihazda web bildirimleri desteklenmiyor.';
-        return;
-      }
-      const ready=await hasReadySubscription();
-      if(ready){
-        hideGate();
-        return;
-      }
-      showGate();
-      btn.disabled=false;
-      if(Notification.permission==='denied'){
-        btn.textContent='⚙️ Bildirim Ayarlarını Aç';
-        status.textContent='Bildirim izni daha önce kapatılmış.';
-        hint.textContent=platformText();
-        hint.style.display='block';
-      }else{
-        btn.textContent='🔔 Bildirimleri Etkinleştir';
-        status.textContent='';
-        hint.style.display='none';
-      }
-    }finally{ checking=false; }
-  }
-
-  btn.addEventListener('click',async function(){
-    if(checking)return;
-    btn.disabled=true;
-    status.textContent='';
-    try{
-      if(Notification.permission==='denied'){
-        status.textContent='Bildirimleri cihaz ayarlarından açman gerekiyor.';
-        hint.textContent=platformText();
-        hint.style.display='block';
-
-        // iOS web/PWA tarafında Apple'ın native UIApplication API'si yoktur.
-        // Yine de iOS'un Settings uygulamasını açmayı deneyelim. Bazı iOS/PWA
-        // sürümlerinde app-settings: çalışır; çalışmazsa kullanıcıya mevcut
-        // manuel yolu göstermeye devam ederiz. Bu deneme mevcut bildirim
-        // aboneliği/Supabase akışına dokunmaz.
-        const ua=navigator.userAgent||'';
-        const isIOS=/iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-        if(isIOS){
-          let returned=false;
-          const onHidden=()=>{ returned=true; document.removeEventListener('visibilitychange',onHidden); };
-          document.addEventListener('visibilitychange',onHidden);
-          try{ window.location.href='app-settings:'; }catch(_){ }
-          setTimeout(()=>{
-            document.removeEventListener('visibilitychange',onHidden);
-            if(!returned){
-              status.textContent='Ayarlar otomatik açılamadı. Aşağıdaki yolu kullan.';
-              hint.textContent=platformText();
-              hint.style.display='block';
-            }
-          },1200);
-        }
-        return;
-      }
-      const permission=await Notification.requestPermission();
-      if(permission!=='granted'){
-        status.textContent='Bildirim izni verilmeden uygulama açılamaz.';
-        return;
-      }
-      if(window.BarBossNotifications?.saveCurrentPushSubscription){
-        await window.BarBossNotifications.saveCurrentPushSubscription();
-      }else{
-        throw new Error('Bildirim aboneliği hazır değil.');
-      }
-      const ready=await hasReadySubscription();
-      if(!ready)throw new Error('Bu cihaz için bildirim aboneliği oluşturulamadı.');
-      hideGate();
-    }catch(e){
-      status.textContent=e?.message||'Bildirim kurulamadı.';
-    }finally{
-      btn.disabled=false;
-    }
-  });
-
-  // Login tamamlandıktan sonra currentProfile oluşunca kontrol et.
-  let tries=0;
-  const timer=setInterval(async()=>{
-    tries++;
-    if(typeof currentProfile!=='undefined'&&currentProfile?.id){
-      clearInterval(timer);
-      await checkGate();
-    }else if(tries>80){
-      clearInterval(timer);
-    }
-  },500);
-
-  // Ayarlardan izin verip uygulamaya geri dönüldüğünde tekrar kontrol et.
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) setTimeout(checkGate,500); });
-  window.addEventListener('focus',()=>setTimeout(checkGate,500));
 })();
 </script>
 </body></html>
