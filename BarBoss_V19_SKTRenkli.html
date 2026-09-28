@@ -847,7 +847,7 @@ function days(p){
   const diff=Math.round((expiry-today)/86400000);
   return diff<0?diff:(diff===0?0:diff+1);
 }
-function level(p){let d=days(p);if(d<0)return ['danger',d+' gün'];if(d===0)return ['warn','Son gün'];if(d<=5)return ['danger',d+' gün'];if(d<=15)return ['warn',d+' gün'];if(d<=30)return ['blue',d+' gün'];return ['ok',d+' gün']}
+function level(p){let d=days(p);if(d<0)return ['danger',d+' gün'];if(d===0)return ['danger','Son gün'];if(d<=5)return ['danger',d+' gün'];if(d<=15)return ['warn',d+' gün'];if(d<=30)return ['blue',d+' gün'];return ['ok',d+' gün']}
 function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
