@@ -940,7 +940,32 @@ async function getReceivedNotifications(){
     if(!old || (Number(n.receivedAt)||0)>=(Number(old.receivedAt)||0)) merged.set(id,{...n,id,_local:local});
     else if(old) merged.set(id,{...old,_local:local});
   });
-  return [...merged.values()].sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0));
+
+  // Web Push tarafında aynı bildirim iki farklı kaynaktan gelebilir:
+  // 1) service worker'ın yerel kaydı, 2) Supabase notification_history kaydı.
+  // Sunucu şu an push payload'ına history ID koymadığı için bunları içerik +
+  // zaman yakınlığı ile birleştiriyoruz. Böylece aynı bildirim iki kart olmaz.
+  // Yerel kayıt korunur; böylece YENİ/Okundu durumu doğru çalışmaya devam eder.
+  const list=[...merged.values()].sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0));
+  const result=[];
+  for(const n of list){
+    const duplicateIndex=result.findIndex(x=>{
+      if(Boolean(x._local)===Boolean(n._local)) return false;
+      const sameTitle=String(x.title||'').trim()===String(n.title||'').trim();
+      const sameBody=String(x.body||'').trim()===String(n.body||'').trim();
+      const dt=Math.abs((Number(x.receivedAt)||0)-(Number(n.receivedAt)||0));
+      return sameTitle && sameBody && dt<=30000;
+    });
+    if(duplicateIndex>=0){
+      const existing=result[duplicateIndex];
+      // Local push kaydı tercih edilir; çünkü okunmamış/okundu durumu bunun
+      // üzerinden tutuluyor. Sunucu kaydı sadece ikinci kopyadır.
+      if(n._local && !existing._local) result[duplicateIndex]=n;
+      continue;
+    }
+    result.push(n);
+  }
+  return result;
 }
 async function saveReceivedNotificationFromPage(n){
   const item={id:String(n?.id||(`${n?.receivedAt||Date.now()}-${n?.title||''}-${n?.body||''}`)),title:n?.title||'NN BarBoss',body:n?.body||'',receivedAt:Number(n?.receivedAt)||Date.now(),_local:true};
