@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v1-6';
+const CACHE='numnum-skt-v1-7';
 const APP_URL=new URL('/NumNum-Skt/BarBoss_V19_SKTRenkli.html',self.location.origin).href;
 const NOTIFICATION_URL=APP_URL+'?open=notifications';
 const DB_NAME='BarBossNotifications';
@@ -27,8 +27,9 @@ function openNotificationDB(){
 }
 
 async function saveNotification(data){
+  let db=null;
   try{
-    const db=await openNotificationDB();
+    db=await openNotificationDB();
     const id=(self.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await new Promise((resolve,reject)=>{
       const tx=db.transaction(STORE,'readwrite');
@@ -36,22 +37,41 @@ async function saveNotification(data){
         id,
         title:data.title||'NN BarBoss',
         body:data.body||'',
-        receivedAt:Date.now()
+        receivedAt:Number(data.receivedAt)||Date.now()
       });
       tx.oncomplete=resolve;
       tx.onerror=()=>reject(tx.error||new Error('Kayıt başarısız'));
+      tx.onabort=()=>reject(tx.error||new Error('Kayıt iptal edildi'));
     });
-    db.close();
-  }catch(_e){}
+    return true;
+  }catch(_e){
+    return false;
+  }finally{
+    try{db?.close();}catch(_){}
+  }
 }
+
+const HISTORY_FALLBACK_SCRIPT=`<script>(function(){
+  if(window.__BARBOSS_NOTIFICATION_HISTORY_FALLBACK__)return;
+  window.__BARBOSS_NOTIFICATION_HISTORY_FALLBACK__=true;
+  const DB='BarBossNotifications',VER=1,STORE='items';
+  function openDB(){return new Promise((resolve,reject)=>{try{
+    const r=indexedDB.open(DB,VER);
+    r.onupgradeneeded=function(){const db=r.result;if(!db.objectStoreNames.contains(STORE)){const s=db.createObjectStore(STORE,{keyPath:'id'});s.createIndex('receivedAt','receivedAt',{unique:false});}};
+    r.onsuccess=function(){resolve(r.result)};r.onerror=function(){reject(r.error||new Error('db'))};
+  }catch(e){reject(e)}})}
+  async function save(n){try{const db=await openDB();const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put({id,title:n.title||'NN BarBoss',body:n.body||'',receivedAt:Number(n.receivedAt)||Date.now()});tx.oncomplete=res;tx.onerror=()=>rej(tx.error||new Error('write'));tx.onabort=()=>rej(tx.error||new Error('abort'))});db.close();if(typeof window.renderReceivedNotifications==='function')window.renderReceivedNotifications()}catch(e){}}
+  navigator.serviceWorker&&navigator.serviceWorker.addEventListener('message',function(ev){if(ev.data&&ev.data.type==='BARBOSS_NOTIFICATION_SAVED'&&ev.data.notification)save(ev.data.notification)});
+})();</script>`;
 
 self.addEventListener('push',event=>{
   let data={};
   try{data=event.data?event.data.json():{};}catch(_){try{data={body:event.data?event.data.text():''};}catch(__){}}
   const title=data.title||'NN BarBoss';
   const body=data.body||'';
+  const receivedAt=Date.now();
   event.waitUntil((async()=>{
-    await saveNotification({title,body});
+    const saved=await saveNotification({title,body,receivedAt});
     await self.registration.showNotification(title,{
       body,
       icon:data.icon||'./icon-192.png',
@@ -62,7 +82,7 @@ self.addEventListener('push',event=>{
       renotify:true
     });
     const cs=await clients.matchAll({type:'window',includeUncontrolled:true});
-    cs.forEach(c=>{try{c.postMessage({type:'BARBOSS_NOTIFICATION_SAVED'});}catch(_){}});
+    cs.forEach(c=>{try{c.postMessage({type:'BARBOSS_NOTIFICATION_SAVED',notification:{title,body,receivedAt},saved});}catch(_){}});
   })());
 });
 
@@ -71,8 +91,7 @@ self.addEventListener('notificationclick',event=>{
   event.waitUntil((async()=>{
     const target=NOTIFICATION_URL;
     const all=await clients.matchAll({type:'window',includeUncontrolled:true});
-    for(const client of all){
-      try{if('navigate' in client)await client.navigate(target);await client.focus();return;}catch(_){}}
+    for(const client of all){try{if('navigate' in client)await client.navigate(target);await client.focus();return;}catch(_){}}
     if(clients.openWindow)await clients.openWindow(target);
   })());
 });
@@ -87,10 +106,11 @@ self.addEventListener('fetch',event=>{
       try{
         const isNotif=url.searchParams.get('open')==='notifications';
         const response=await fetch(isNotif?APP_URL:event.request,{cache:'no-store'});
-        if(isNotif&&response.ok){
+        if(response.ok){
           let html=await response.text();
-          const injected=`<script id="barboss-notification-open">(function(){var n=0,t=setInterval(function(){try{if(typeof show==='function'&&typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.id){show('notifications');clearInterval(t)}}catch(e){}if(++n>80)clearInterval(t)},250)})();<\/script>`;
-          html=html.includes('</body>')?html.replace('</body>',injected+'\n</body>'):html+injected;
+          const injected=isNotif?`<script id="barboss-notification-open">(function(){var n=0,t=setInterval(function(){try{if(typeof show==='function'&&typeof currentProfile!=='undefined'&&currentProfile&&currentProfile.id){show('notifications');clearInterval(t)}}catch(e){}if(++n>80)clearInterval(t)},250)})();<\/script>`:'';
+          const addition=HISTORY_FALLBACK_SCRIPT+(injected?'\n'+injected:'');
+          html=html.includes('</body>')?html.replace('</body>',addition+'\n</body>'):html+addition;
           const headers=new Headers(response.headers);headers.delete('content-encoding');headers.delete('content-length');headers.set('content-type','text/html; charset=utf-8');
           return new Response(html,{status:response.status,statusText:response.statusText,headers});
         }
