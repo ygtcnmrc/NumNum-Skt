@@ -567,18 +567,41 @@ async function ensureActiveBranch(){
   return selectedBranchId;
 }
 
+async function handleNotificationDeepLink(){
+  let shouldOpen=false;
+  try{
+    const params=new URLSearchParams(location.search);
+    shouldOpen=params.get('notifications')==='1';
+    if(sessionStorage.getItem('BARBOSS_OPEN_NOTIFICATIONS_AFTER_LOGIN')==='1'){
+      shouldOpen=true;
+      sessionStorage.removeItem('BARBOSS_OPEN_NOTIFICATIONS_AFTER_LOGIN');
+    }
+  }catch(_){}
+  if(shouldOpen && currentProfile?.id){
+    try{
+      await show('notifications');
+      // Tekrar açıldığında aynı deep-link'in yeniden tetiklenmesini engelle.
+      if(history.replaceState){
+        const u=new URL(location.href);
+        u.searchParams.delete('notifications');
+        history.replaceState({},document.title,u.href);
+      }
+    }catch(_){}
+  }
+}
+
 async function initAuth(){
   const form=document.getElementById('loginForm');
   form?.addEventListener('submit',async e=>{
     e.preventDefault();hideLoginError();setLoginBusy(true);
-    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);await showApp();render();await renderReceivedNotifications();showWelcomeCrow();}
+    try{await loginWithUsername(document.getElementById('loginUsername').value,document.getElementById('loginPassword').value);await showApp();render();await renderReceivedNotifications();await handleNotificationDeepLink();showWelcomeCrow();}
     catch(err){showLoginError(err?.message||'Giriş yapılamadı.');}
     finally{setLoginBusy(false)}
   });
   const {data:{session}}=await supabaseClient.auth.getSession();
   if(session?.user){
     const {data:profile,error}=await supabaseClient.from('profiles').select('id,full_name,role,branch_id,is_active').eq('id',session.user.id).single();
-    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));await syncCatalogFromSupabase();await showApp();render();await renderReceivedNotifications();showWelcomeCrow();return;}
+    if(!error&&profile?.is_active){currentProfile=profile;sessionStorage.setItem(APP_AUTH_KEY,JSON.stringify({full_name:profile.full_name,role:profile.role,branch_id:profile.branch_id}));await syncCatalogFromSupabase();await showApp();render();await renderReceivedNotifications();await handleNotificationDeepLink();showWelcomeCrow();return;}
     await supabaseClient.auth.signOut();
   }
   showLogin();
@@ -931,11 +954,28 @@ async function clearReceivedNotifications(){
   await renderReceivedNotifications();
 }
 document.getElementById('clearReceivedNotifications')?.addEventListener('click',clearReceivedNotifications);
+
+// Web Push bildirimine dokunulduğunda uygulamanın Bildirimler sekmesini aç.
+// Uygulama zaten açıksa yeni sekme/pencere açmak yerine mevcut uygulamayı öne getir.
+async function openNotificationsFromPush(){
+  try{
+    if(currentProfile?.id){
+      await show('notifications');
+    }else{
+      sessionStorage.setItem('BARBOSS_OPEN_NOTIFICATIONS_AFTER_LOGIN','1');
+    }
+  }catch(_){
+    try{sessionStorage.setItem('BARBOSS_OPEN_NOTIFICATIONS_AFTER_LOGIN','1')}catch(__){}
+  }
+}
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',async event=>{
     if(event.data?.type==='BARBOSS_NOTIFICATION_SAVED'){
       if(event.data.notification) await saveReceivedNotificationFromPage(event.data.notification);
       await renderReceivedNotifications();
+    }
+    if(event.data?.type==='BARBOSS_OPEN_NOTIFICATIONS'){
+      await openNotificationsFromPush();
     }
   });
 }

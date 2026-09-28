@@ -1,4 +1,4 @@
-const CACHE='numnum-skt-v5-1';
+const CACHE='numnum-skt-v5-2';
 
 const APP_URL = new URL('./BarBoss_V19_SKTRenkli.html', self.location.origin).href;
 
@@ -125,41 +125,29 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil((async () => {
-    let target = event.notification?.data?.url;
-
-    // Eski bildirimlerde './' veya '/' gönderilmiş olabilir.
-    // Bunları GitHub Pages köküne değil, gerçek BarBoss HTML'sine yönlendir.
-    try {
-      if (!target || target === './' || target === '/' ||
-          target === self.location.origin || target === self.location.origin + '/') {
-        target = APP_URL;
-      } else {
-        const resolved = new URL(target, self.location.origin);
-        if (resolved.origin === self.location.origin &&
-            (resolved.pathname === '/' || resolved.pathname === '')) {
-          target = APP_URL;
-        } else {
-          target = resolved.href;
-        }
-      }
-    } catch (_) {
-      target = APP_URL;
-    }
+    // Bildirim tıklandığında her zaman BarBoss uygulamasına dön.
+    // Eski bildirim payload'larında yanlış/boş URL olsa bile GitHub Pages köküne
+    // gitmesini engellemek için payload URL'sini burada kullanmıyoruz.
+    const target = new URL(APP_URL);
+    target.searchParams.set('notifications','1');
 
     const allClients = await clients.matchAll({
       type: 'window',
       includeUncontrolled: true
     });
 
+    // Uygulama zaten açıksa aynı pencereyi öne getir ve doğrudan Bildirimler
+    // sekmesini açmasını söyle. Böylece yeni bir web sayfası açılmaz.
     for (const client of allClients) {
       try {
         await client.focus();
-        if ('navigate' in client) await client.navigate(target);
+        client.postMessage({type:'BARBOSS_OPEN_NOTIFICATIONS'});
         return;
       } catch (_) {}
     }
 
-    if (clients.openWindow) await clients.openWindow(target);
+    // Uygulama kapalıysa gerçek HTML dosyasını, Bildirimler deep-link'i ile aç.
+    if (clients.openWindow) await clients.openWindow(target.href);
   })());
 });
 
