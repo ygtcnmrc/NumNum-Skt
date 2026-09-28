@@ -791,21 +791,73 @@ function level(p){let d=days(p);if(d<0)return ['danger',d+' gün'];if(d<=5)retur
 function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
-function renderReceivedNotifications(){
+const NOTIFICATION_DB_NAME='BarBossNotifications';
+const NOTIFICATION_DB_VERSION=1;
+const NOTIFICATION_STORE='items';
+function openReceivedNotificationsDB(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){reject(new Error('IndexedDB desteklenmiyor'));return;}
+    const req=indexedDB.open(NOTIFICATION_DB_NAME,NOTIFICATION_DB_VERSION);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(NOTIFICATION_STORE)){
+        const store=db.createObjectStore(NOTIFICATION_STORE,{keyPath:'id'});
+        store.createIndex('receivedAt','receivedAt',{unique:false});
+      }
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('Bildirim geçmişi açılamadı'));
+  });
+}
+async function getReceivedNotifications(){
+  try{
+    const db=await openReceivedNotificationsDB();
+    const items=await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readonly');
+      const req=tx.objectStore(NOTIFICATION_STORE).getAll();
+      req.onsuccess=()=>resolve(req.result||[]);
+      req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    return items.sort((a,b)=>(Number(b.receivedAt)||0)-(Number(a.receivedAt)||0));
+  }catch(_){return [];}
+}
+async function renderReceivedNotifications(){
   const box=document.getElementById('receivedNotificationsList');
   if(!box)return;
-  let items=[];
-  try{items=JSON.parse(localStorage.getItem('barboss_received_notifications_v1')||'[]');}catch(_){items=[];}
-  if(!Array.isArray(items)||!items.length){
+  const items=await getReceivedNotifications();
+  if(!items.length){
     box.innerHTML='<div class="empty">Henüz gelen bildirim yok.</div>';
     return;
   }
-  box.innerHTML=items.slice(0,50).map(n=>`<div class="card item" style="box-shadow:none;border:1px solid #edf0ee;margin-top:8px"><div class="row"><div><b>${esc(n.title||'BarBoss Bildirimi')}</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(n.body||'')}</div></div><span class="muted" style="font-size:11px">${esc(n.date||'')}</span></div></div>`).join('');
+  box.innerHTML=items.slice(0,50).map(n=>{
+    let date='';
+    try{date=new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(Number(n.receivedAt)||Date.now()));}
+    catch(_){date='';}
+    return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee;margin-top:8px"><div class="row"><div><b>${esc(n.title||'BarBoss Bildirimi')}</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(n.body||'')}</div></div><span class="muted" style="font-size:11px">${esc(date)}</span></div></div>`;
+  }).join('');
 }
-document.getElementById('clearReceivedNotifications')?.addEventListener('click',()=>{
-  localStorage.removeItem('barboss_received_notifications_v1');
-  renderReceivedNotifications();
-});
+async function clearReceivedNotifications(){
+  try{
+    const db=await openReceivedNotificationsDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(NOTIFICATION_STORE,'readwrite');
+      tx.objectStore(NOTIFICATION_STORE).clear();
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }catch(_){ }
+  await renderReceivedNotifications();
+}
+document.getElementById('clearReceivedNotifications')?.addEventListener('click',clearReceivedNotifications);
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='BARBOSS_NOTIFICATION_SAVED'){
+      renderReceivedNotifications();
+    }
+  });
+}
 async function show(page){
   const role=String(currentProfile?.role||'').trim().toLowerCase();
   const adminPages=['userAdd','userManage','branchManage'];
