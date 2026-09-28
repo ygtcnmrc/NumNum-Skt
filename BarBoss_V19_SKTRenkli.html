@@ -839,8 +839,15 @@ db.products.forEach(p=>{if(p.barcode&&p.name&&p.category){db.barcodeMap[p.barcod
 Object.entries(seed).forEach(([c,ps])=>{if(!db.categories.includes(c))db.categories.push(c);if(!db.catalog[c])db.catalog[c]=[];ps.forEach(p=>{if(!db.catalog[c].includes(p))db.catalog[c].push(p)})});
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
 const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-function days(p){return Math.ceil((new Date(p.expiry+'T23:59:59')-new Date())/86400000)}
-function level(p){let d=days(p);if(d<0)return ['danger',d+' gün'];if(d<=5)return ['danger',d+' gün'];if(d<=15)return ['warn',d+' gün'];if(d<=30)return ['blue',d+' gün'];return ['ok',d+' gün']}
+function days(p){
+  const [y,m,d]=String(p.expiry).split('-').map(Number);
+  const now=new Date();
+  const today=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate());
+  const expiry=Date.UTC(y,m-1,d);
+  const diff=Math.round((expiry-today)/86400000);
+  return diff<0?diff:(diff===0?0:diff+1);
+}
+function level(p){let d=days(p);if(d<0)return ['danger',d+' gün'];if(d===0)return ['warn','Son gün'];if(d<=5)return ['danger',d+' gün'];if(d<=15)return ['warn',d+' gün'];if(d<=30)return ['blue',d+' gün'];return ['ok',d+' gün']}
 function fmt(s){return new Date(s+'T00:00:00').toLocaleDateString('tr-TR')}
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').classList.add('hidden'),2600)}
 function render(){fillCats();renderStats();renderAlerts();renderProducts();renderSummary();renderCategoriesPage();renderManage();renderProductTemplate();$('today').textContent=new Date().toLocaleDateString('tr-TR')}
