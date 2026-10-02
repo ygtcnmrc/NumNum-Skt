@@ -339,8 +339,20 @@ function startDataRealtime(){
   dataRealtimeChannel=supabaseClient
     .channel('barskt-data-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'stock_records'},payload=>{
-      const changedBranchId=payload.new?.branch_id||payload.old?.branch_id;
       const activeBranchId=selectedBranchId||currentProfile?.branch_id;
+      // DELETE olaylarında Supabase Realtime çoğu kurulumda yalnızca eski kaydın
+      // primary key bilgisini gönderir; branch_id gelmeyebilir. Bu durumda
+      // silinen kaydın şubesini payload üzerinden doğrulayamıyoruz.
+      // Silme işlemini kaçırmamak için DELETE olayında aktif stok listesini
+      // doğrudan yeniliyoruz. INSERT/UPDATE olaylarında mevcut şube filtresi
+      // aynen korunuyor.
+      if(payload.eventType==='DELETE'){
+        if(!activeBranchId)return;
+        dataRealtimeFlags.stock=true;
+        scheduleDataRealtimeRefresh();
+        return;
+      }
+      const changedBranchId=payload.new?.branch_id||payload.old?.branch_id;
       if(!changedBranchId||!activeBranchId||String(changedBranchId)!==String(activeBranchId))return;
       dataRealtimeFlags.stock=true;
       scheduleDataRealtimeRefresh();
