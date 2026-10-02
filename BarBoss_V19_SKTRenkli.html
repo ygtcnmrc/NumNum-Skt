@@ -1693,10 +1693,11 @@ $('save').onclick=async()=>{
     const {error}=await supabaseClient.from('stock_records').update(payload).eq('id',editingId).eq('branch_id',branchId);
     if(error){toast(error.message||'Stok kaydı güncellenemedi.');return;}
     if(old){
-      if(old.quantity!==undefined) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'quantity',oldValue:old.qty,newValue:qty});
+      if(Number(old.qty)!==Number(qty)) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'quantity',oldValue:old.qty,newValue:qty});
       if(old.expiry!==exp) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'expiry_date',oldValue:old.expiry,newValue:exp});
       if(old.product_id!==productId) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'product_id',oldValue:old.product_id,newValue:productId});
       if(old.unit!==unit) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'unit',oldValue:old.unit,newValue:unit});
+      if(String(old.note||'')!==String(note||'')) await writeAudit({branchId,productId,stockRecordId:editingId,action:'STOK_GUNCELLE',fieldName:'note',oldValue:old.note||'',newValue:note||''});
     }
     resetForm();await syncStockFromSupabase();show('products');toast(code?'Stok kaydı güncellendi · barkod ürün kataloğunda':'Stok kaydı güncellendi');return;
   }
