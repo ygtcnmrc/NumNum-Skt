@@ -517,7 +517,7 @@ async function loginWithUsername(username,password){
 }
 
 
-async function auditScopedField(fieldName,stockRecordId){
+function auditScopedField(fieldName,stockRecordId){
   if(!stockRecordId)return fieldName;
   return `${fieldName||'stock_record'}::stock:${stockRecordId}`;
 }
@@ -1266,11 +1266,13 @@ function auditUserName(u){
   return (u?.full_name||u?.username||'Bilinmeyen kullanıcı').trim();
 }
 async function showProductHistory(stockRecordId,productName,branchId){
+  const stockRow=(db.products||[]).find(x=>String(x.id)===String(stockRecordId));
+  const historyLabel=stockRow?.expiry ? `${productName} · SKT ${fmt(stockRow.expiry)}` : productName;
   const modal=document.createElement('div');
   modal.className='auditHistoryModal';
   modal.innerHTML=`<div class="auditHistoryBox">
     <div class="row" style="margin-bottom:8px">
-      <div><h3 style="margin:0">🕘 İşlem Geçmişi</h3><div class="muted">${esc(productName)}</div></div>
+      <div><h3 style="margin:0">🕘 İşlem Geçmişi</h3><div class="muted">${esc(historyLabel)}</div></div>
       <button class="icon" type="button" id="closeAuditHistory">✕</button>
     </div>
     <div id="auditHistoryBody" class="muted">Geçmiş yükleniyor...</div>
