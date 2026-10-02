@@ -1259,7 +1259,7 @@ function auditActionText(a){
 }
 function auditFieldText(f){
   const base=auditBaseField(f);
-  const map={quantity:'Miktar',expiry_date:'SKT',product_id:'Ürün',unit:'Birim',stock_record:'Stok kaydı'};
+  const map={quantity:'Stok',expiry_date:'SKT',product_id:'Ürün',unit:'Birim',note:'Not',stock_record:'Stok kaydı'};
   return map[base]||base||'';
 }
 function auditUserName(u){
@@ -1288,7 +1288,7 @@ async function showProductHistory(stockRecordId,productName,branchId){
     if(branchId) q=q.eq('branch_id',branchId);
     const {data,error}=await q;
     if(error) throw error;
-    const logs=(data||[]).filter(l=>auditStockMarker(l.field_name)===String(stockRecordId));
+    const logs=(data||[]).filter(l=>l.action!=='STOK_SIL' && auditStockMarker(l.field_name)===String(stockRecordId));
     const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
     let users=[];
     if(ids.length){
