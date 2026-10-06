@@ -2441,7 +2441,7 @@ if('serviceWorker' in navigator){
   backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
 }
 #barbossNotificationGate.show{display:flex}
-#barbossNotificationGate .gateBox{
+#barbossNotificationGate .gateBox{position:relative;
   width:min(92vw,520px);background:#fff;border-radius:28px;
   padding:28px 22px 24px;text-align:center;
   box-shadow:0 24px 80px rgba(0,0,0,.35);
@@ -2467,11 +2467,15 @@ if('serviceWorker' in navigator){
 
 <div id="barbossNotificationGate" aria-hidden="true">
   <div class="gateBox" role="dialog" aria-modal="true" aria-labelledby="barbossNotificationGateTitle">
+    <button type="button" id="barbossNotificationGateClose" aria-label="Kapat"
+      style="position:absolute;right:14px;top:14px;width:42px;height:42px;border:0;border-radius:50%;background:#f1f5f3;color:#174f3d;font-size:28px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08)">×</button>
     <div class="gateIcon">🔔</div>
     <h2 id="barbossNotificationGateTitle">Bildirimleri Etkinleştir</h2>
     <p>BarBoss'u kullanabilmek ve SKT, stok ve yöneticilerden gelen önemli bildirimleri alabilmek için bu cihazda bildirimleri etkinleştirmen gerekiyor.</p>
     <button type="button" class="gateBtn" id="barbossNotificationGateBtn">🔔 Bildirimleri Etkinleştir</button>
     <div class="gateStatus" id="barbossNotificationGateStatus"></div>
+    <button type="button" id="barbossNotificationGateSkip"
+      style="margin-top:12px;border:0;background:transparent;color:#176b52;font-weight:700;font-size:15px;cursor:pointer;padding:8px 14px">Şimdilik geç</button>
     <div class="gateHelp" id="barbossNotificationGateHelp"></div>
   </div>
 </div>
@@ -2484,6 +2488,9 @@ if('serviceWorker' in navigator){
   const btn=document.getElementById('barbossNotificationGateBtn');
   const status=document.getElementById('barbossNotificationGateStatus');
   const help=document.getElementById('barbossNotificationGateHelp');
+  const closeBtn=document.getElementById('barbossNotificationGateClose');
+  const skipBtn=document.getElementById('barbossNotificationGateSkip');
+  const GATE_SKIP_KEY='barboss_notification_gate_skip_test_v1';
   if(!gate||!btn)return;
 
   let gateBusy=false;
@@ -2518,9 +2525,18 @@ if('serviceWorker' in navigator){
     return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
   }
 
-  async function refreshGate(){
+  function gateSkipped(){
+      try{return localStorage.getItem(GATE_SKIP_KEY)==='1';}catch(_){return false;}
+    }
+    function skipGate(){
+      try{localStorage.setItem(GATE_SKIP_KEY,'1');}catch(_){}
+      hideGate();
+    }
+
+    async function refreshGate(){
     // Login screen is handled separately. Never show the gate before a user session exists.
     if(typeof currentProfile==='undefined' || !currentProfile?.id)return;
+      if(gateSkipped())return;
 
     if(!notificationSupported()){
       showGate();
@@ -2607,7 +2623,18 @@ if('serviceWorker' in navigator){
     }
   }
 
-  btn.addEventListener('click', async function(){
+  if(closeBtn){
+      closeBtn.addEventListener('click',function(){
+        skipGate();
+      });
+    }
+    if(skipBtn){
+      skipBtn.addEventListener('click',function(){
+        skipGate();
+      });
+    }
+
+    btn.addEventListener('click', async function(){
     if(gateBusy)return;
     gateBusy=true;
     btn.disabled=true;
