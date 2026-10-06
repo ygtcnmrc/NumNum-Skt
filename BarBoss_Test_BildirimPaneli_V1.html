@@ -1324,23 +1324,31 @@ function toggleAutoFields(){const t=document.getElementById('autoTrigger')?.valu
 function openAutoCreate(){document.getElementById('autoNotifListPanel')?.classList.add('hidden');document.getElementById('autoNotifCreatePanel')?.classList.remove('hidden');renderDemoPeople();if(!document.querySelector('#timeRows .timeRow'))addTime('09:00');}
 function closeAutoCreate(){document.getElementById('autoNotifCreatePanel')?.classList.add('hidden');document.getElementById('autoNotifListPanel')?.classList.remove('hidden');}
 function renderAutoRules(){const box=document.getElementById('savedAutoNotifList');if(!box)return;const rules=[{id:'open',name:'🌅 Açılış Check-list',meta:'Her gün · 09:00, 10:00, 11:00 · Tüm aktif kullanıcılar',msg:'📌 Açılış check-list🚨\nAçılış checklist’ini doldurmayı unutmayın✅',active:true},{id:'close',name:'🌙 Kapanış Check-list',meta:'Her gün · 21:00, 22:00, 23:00 · Tüm aktif kullanıcılar',msg:'📌 Kapanış check-list🚨\nKapanış checklist’ini doldurmayı unutmayın✅',active:true},...demoAutoRules];box.innerHTML=rules.map(x=>`<div class="autoRuleCard"><div class="row" style="align-items:flex-start"><div><b>${x.name}</b><div class="ruleMeta">${x.meta||'Özel otomasyon'}</div></div><span class="roleBadge ${x.active===false?'statusPaused':'statusActive'}">${x.active===false?'⏸️ Pasif':'🟢 Aktif'}</span></div><div class="ruleMsg">${x.msg||''}</div><div class="ruleActions"><button class="secondary" type="button" data-edit="${x.id}">✏️ Düzenle</button><button class="secondary" type="button" data-toggle="${x.id}">${x.active===false?'▶️ Aktifleştir':'⏸️ Pasife Al'}</button><button class="secondary" type="button" data-copy="${x.id}">📋 Kopyala</button><button class="secondary dangerText" type="button" data-delete="${x.id}">🗑️ Sil</button></div></div>`).join('');}
-function saveAutoRule(){const name=document.getElementById('autoName').value.trim();if(!name)return toast('Bildirim adı gir.');const trigger=document.getElementById('autoTrigger').value;const days=[...document.querySelectorAll('#dayFields input[type=checkbox]:checked')].map(x=>x.value);const times=[...document.querySelectorAll('#timeRows input[type=time]')].map(x=>x.value);const people=[...document.querySelectorAll('.personPick:checked')].map(x=>x.value);const rule={id:'demo_'+Date.now(),name,trigger,value:document.getElementById('autoValue').value,compare:document.getElementById('autoCompare').value,days,times,branch:document.getElementById('autoBranch').value,role:document.getElementById('autoRole').value,people,title:document.getElementById('autoTitle').value,message:document.getElementById('autoMessage').value,sendMode:document.getElementById('autoSendMode').value,active:document.getElementById('autoStatus').value==='active',meta:`${trigger==='schedule'?(days.length?'Seçili günler':'Her gün')} · ${times.length?times.join(', '):'Olay bazlı'} · ${document.getElementById('autoBranch').selectedOptions[0].textContent}`,msg:`${document.getElementById('autoTitle').value||'🔔 Bildirim'}\n${document.getElementById('autoMessage').value||''}`};demoAutoRules.push(rule);localStorage.setItem('barboss_demo_auto_rules_v3',JSON.stringify(demoAutoRules));renderAutoRules();closeAutoCreate();toast('Test bildirimi kaydedildi. Bu V3 sürümünde sadece cihazda saklanır; canlı bildirim göndermez.');}
-document.getElementById('newAutoNotificationBtn2')?.addEventListener('click',openAutoCreate);document.getElementById('demoCancelAutoNotif')?.addEventListener('click',closeAutoCreate);document.getElementById('demoCancelAutoNotifTop')?.addEventListener('click',closeAutoCreate);document.getElementById('demoSaveAutoNotif')?.addEventListener('click',saveAutoRule);document.getElementById('demoPreviewAutoNotif')?.addEventListener('click',()=>toast((document.getElementById('autoTitle').value||'🔔 Bildirim')+'\n'+(document.getElementById('autoMessage').value||'Mesaj boş')));document.getElementById('addTimeBtn')?.addEventListener('click',()=>addTime());document.getElementById('autoTrigger')?.addEventListener('change',toggleAutoFields);document.getElementById('autoBranch')?.addEventListener('change',renderDemoPeople);document.getElementById('autoRole')?.addEventListener('change',renderDemoPeople);document.getElementById('dayPreset')?.addEventListener('change',e=>{const v=e.target.value;document.querySelectorAll('#dayFields input[type=checkbox]').forEach(c=>c.checked=v==='all'||(v==='weekdays'&&['1','2','3','4','5'].includes(c.value))||(v==='weekend'&&['6','0'].includes(c.value)));});renderAutoRules();toggleAutoFields();
-
-document.querySelectorAll('nav button[data-page]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.page)));
-document.getElementById('notificationBell')?.addEventListener('click',()=>show('notifications'));
-document.getElementById('logoutBtn')?.addEventListener('click',logout);
-function fillCats(){let o=db.categories.map(c=>`<option>${esc(c)}</option>`).join('');$('category').innerHTML=o;$('filter').innerHTML='<option value="">Tüm kategoriler</option>'+o}
-function renderStats(){let ps=db.products;$('total').textContent=ps.length;$('d30').textContent=ps.filter(p=>days(p)>=0&&days(p)<=30).length;$('d15').textContent=ps.filter(p=>days(p)>=0&&days(p)<=15).length;$('d5').textContent=ps.filter(p=>days(p)>=0&&days(p)<=5).length}
-function renderAlerts(){let ps=db.products.filter(p=>{let d=days(p);return d>=0&&d<=30}).sort((a,b)=>days(a)-days(b));let ex=db.products.filter(p=>days(p)<0).sort((a,b)=>days(a)-days(b));let out='';if(ex.length)out+=`<div class="sectionTitle">⛔ Süresi geçen</div>`+ex.slice(0,15).map(alertCard).join('');if(ps.length)out+=`<div class="sectionTitle">SKT yaklaşan ürünler</div>`+ps.slice(0,30).map(alertCard).join('');$('alerts').innerHTML=out||'<div class="empty">🎉 Yaklaşan SKT yok.</div>'}
-function alertCard(p){let [cl,t]=level(p);return `<div class="card item" style="box-shadow:none;border:1px solid #edf0ee"><div class="row"><div><h3>${esc(p.name)}</h3><p class="muted">${esc(p.category)} · ${p.qty} ${esc(p.unit)}</p></div><span class="pill ${cl}">${t}</span></div><div class="muted">SKT: ${fmt(p.expiry)}</div></div>`}
-
-function formatAuditDate(v){
-  if(!v)return '-';
-  try{
-    return new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(v));
-  }catch(e){return new Date(v).toLocaleString('tr-TR');}
+function saveAutoRule(){
+  const name=document.getElementById('autoName')?.value.trim();
+  if(!name)return toast('Bildirim adı gir.');
+  const trigger=document.getElementById('autoTrigger')?.value||'schedule';
+  const days=[...document.querySelectorAll('#dayFields input[type=checkbox]:checked')].map(x=>x.value);
+  const times=[...document.querySelectorAll('#timeRows input[type=time]')].map(x=>x.value);
+  const people=[...document.querySelectorAll('.personPick:checked')].map(x=>x.value);
+  const autoBranch=document.getElementById('autoBranch');
+  const rule={
+    id:'demo_'+Date.now(), name, trigger,
+    value:document.getElementById('autoValue')?.value||'',
+    compare:document.getElementById('autoCompare')?.value||'', days, times,
+    branch:autoBranch?.value||'all', role:document.getElementById('autoRole')?.value||'all', people,
+    title:document.getElementById('autoTitle')?.value||'', message:document.getElementById('autoMessage')?.value||'',
+    sendMode:document.getElementById('autoSendMode')?.value||'once',
+    active:document.getElementById('autoStatus')?.value==='active',
+    meta:(trigger==='schedule'?(days.length?'Seçili günler':'Her gün'):'Olay bazlı')+' · '+(times.length?times.join(', '):'Olay bazlı')+' · '+(autoBranch?.selectedOptions?.[0]?.textContent||'Tüm şubeler'),
+    msg:(document.getElementById('autoTitle')?.value||'🔔 Bildirim')+'\n'+(document.getElementById('autoMessage')?.value||'')
+  };
+  demoAutoRules.push(rule);
+  localStorage.setItem('barboss_demo_auto_rules_v3',JSON.stringify(demoAutoRules));
+  renderAutoRules(); closeAutoCreate();
+  toast('Test bildirimi kaydedildi. Bu V3 sürümünde sadece cihazda saklanır; canlı bildirim göndermez.');
 }
+
 function auditActionText(a){
   const map={
     STOK_EKLE:'Ürün eklendi',
