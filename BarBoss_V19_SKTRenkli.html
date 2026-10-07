@@ -1304,7 +1304,7 @@ async function showProductHistory(stockRecordId,productName,branchId){
     const ids=[...new Set(logs.map(x=>x.user_id).filter(Boolean))];
     let users=[];
     if(ids.length){
-      const r=await supabaseClient.from('profiles').select('id,full_name,username').in('id',ids);
+      const r=await supabaseClient.rpc('get_audit_actor_profiles',{p_user_ids:ids});
       if(!r.error) users=r.data||[];
     }
     const userMap=Object.fromEntries(users.map(u=>[u.id,u]));
