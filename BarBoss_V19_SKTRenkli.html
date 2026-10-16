@@ -992,7 +992,7 @@ async function updateNotificationBell(){
   try{
     const items=await getReceivedNotifications();
     const readIds=getReadNotificationIds();
-    const unreadCount=items.filter(n=>Boolean(n._local)&&!readIds.has(String(n.id||''))).length;
+    const unreadCount=items.filter(n=>!readIds.has(String(n.id||''))).length;
     if(unreadCount>0){
       bell.classList.add('has-unread');
       bell.dataset.unreadCount=unreadCount>9?'9+':String(unreadCount);
@@ -1063,7 +1063,7 @@ async function renderReceivedNotifications(){
     let date='';
     try{date=new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(Number(n.receivedAt)||Date.now()));}catch(_){ }
     const id=encodeURIComponent(String(n.id||''));
-    const unread=Boolean(n._local)&&!readIds.has(String(n.id||''));
+    const unread=!readIds.has(String(n.id||''));
     const stateClass=unread?'notification-unread':'notification-read';
     const titleClass=unread?'notification-unread-title':'notification-read-title';
     const stateBadge=unread?'<span class="notification-new-badge">● YENİ</span>':'<span class="notification-read-badge">✓ Okundu</span>';
